@@ -1,0 +1,631 @@
+{% extends "base.html" %}
+
+{% block title %}处理中 - DITA Converter{% endblock %}
+
+{% block extra_css %}
+<style>
+    .process-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    
+    .process-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+    
+    .process-header h1 {
+        font-size: 2rem;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    
+    .process-header .filename {
+        color: #7f8c8d;
+        font-size: 1.1rem;
+    }
+    
+    /* 整体进度卡片 */
+    .overall-progress-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        color: white;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        margin-bottom: 3rem;
+    }
+    
+    .overall-progress-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 2rem;
+    }
+    
+    .overall-progress-info h2 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .overall-progress-percentage {
+        font-size: 4rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    
+    .overall-progress-bar {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50px;
+        height: 20px;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .overall-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #48c6ef 0%, #6f86d6 100%);
+        border-radius: 50px;
+        transition: width 0.5s ease;
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+    }
+    
+    /* 层级处理卡片 */
+    .layers-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .layer-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    
+    .layer-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    }
+    
+    .layer-card.active {
+        border-color: #667eea;
+        box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
+    }
+    
+    .layer-card.completed {
+        border-color: #00d4aa;
+    }
+    
+    .layer-card.error {
+        border-color: #ff6b6b;
+    }
+    
+    .layer-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .layer-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+    
+    .layer-icon.layer1 {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .layer-icon.layer2 {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .layer-icon.layer3 {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    }
+    
+    .layer-icon.layer4 {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+    
+    .layer-title h3 {
+        font-size: 1.1rem;
+        color: #2c3e50;
+        margin-bottom: 0.25rem;
+    }
+    
+    .layer-title .layer-status {
+        font-size: 0.85rem;
+        color: #7f8c8d;
+    }
+    
+    .layer-status.processing {
+        color: #667eea;
+        font-weight: 600;
+    }
+    
+    .layer-status.completed {
+        color: #00d4aa;
+        font-weight: 600;
+    }
+    
+    .layer-status.error {
+        color: #ff6b6b;
+        font-weight: 600;
+    }
+    
+    .layer-progress {
+        margin-bottom: 1rem;
+    }
+    
+    .layer-progress-bar {
+        background: #ecf0f1;
+        border-radius: 50px;
+        height: 8px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+    
+    .layer-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50px;
+        transition: width 0.3s ease;
+    }
+    
+    .layer-progress-text {
+        font-size: 0.85rem;
+        color: #7f8c8d;
+        text-align: right;
+    }
+    
+    .layer-details {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        font-size: 0.85rem;
+        color: #555;
+    }
+    
+    .layer-details p {
+        margin: 0.25rem 0;
+    }
+    
+    .layer-details strong {
+        color: #2c3e50;
+    }
+    
+    /* 状态消息 */
+    .status-message {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        margin-bottom: 2rem;
+    }
+    
+    .status-message.success {
+        border-left: 4px solid #00d4aa;
+    }
+    
+    .status-message.error {
+        border-left: 4px solid #ff6b6b;
+    }
+    
+    .status-message.info {
+        border-left: 4px solid #667eea;
+    }
+    
+    .status-message h3 {
+        margin: 0 0 0.5rem 0;
+        color: #2c3e50;
+    }
+    
+    .status-message p {
+        margin: 0;
+        color: #7f8c8d;
+    }
+    
+    /* 操作按钮 */
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .btn-download {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 50px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-download:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-new {
+        background: white;
+        color: #667eea;
+        padding: 1rem 2rem;
+        border-radius: 50px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border: 2px solid #667eea;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .btn-new:hover {
+        background: #667eea;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    /* 加载动画 */
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* 脉冲动画 */
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+    }
+    
+    .pulse {
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    /* 模态框样式 */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+    }
+    
+    .modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-dialog {
+        background: white;
+        border-radius: 16px;
+        max-width: 800px;
+        width: 90%;
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0;
+    }
+    
+    .btn-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6c757d;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .btn-close:hover {
+        color: #495057;
+    }
+    
+    .modal-body {
+        padding: 1.5rem;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+    
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+    
+    .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+        border-color: #545b62;
+    }
+    
+    /* 结果展示样式 */
+    .result-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .result-section h6 {
+        color: #2c3e50;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .result-content {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #e9ecef;
+    }
+    
+    .result-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .stat-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #667eea;
+        margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="process-container">
+    <!-- 页面标题 -->
+    <div class="process-header">
+        <h1><i class="fas fa-cogs"></i> 文档转换处理中</h1>
+        <p class="filename" id="filename">正在加载...</p>
+    </div>
+    
+    <!-- 整体进度 -->
+    <div class="overall-progress-card">
+        <div class="overall-progress-content">
+            <div class="overall-progress-info">
+                <h2>总体进度</h2>
+                <div class="overall-progress-percentage total-progress">0%</div>
+            </div>
+            <div class="overall-progress-bar">
+                <div class="overall-progress-fill progress-fill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 状态消息 -->
+    <div class="status-message info current-message-box" style="display: none;">
+        <h3 id="statusTitle">处理中...</h3>
+        <p class="current-message" id="statusText">正在初始化处理流程</p>
+    </div>
+    
+    <!-- 各层处理进度 -->
+    <div class="layers-grid">
+        <!-- Layer 1 -->
+        <div class="layer-card" data-layer="1">
+            <div class="layer-header">
+                <div class="layer-icon layer1">
+                    <i class="fas fa-file-import"></i>
+                </div>
+                <div class="layer-title">
+                    <h3>Layer 1</h3>
+                    <div class="layer-status">等待中</div>
+                </div>
+            </div>
+            <div class="layer-progress">
+                <div class="layer-progress-bar progress-bar">
+                    <div class="layer-progress-fill"></div>
+                </div>
+                <div class="layer-progress-text progress-text">0%</div>
+            </div>
+            <div class="layer-details">
+                <p><strong>预处理</strong></p>
+                <p>文档解析与结构提取</p>
+                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                    <span class="file-type">文件类型: <strong>--</strong></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Layer 2 -->
+        <div class="layer-card" data-layer="2">
+            <div class="layer-header">
+                <div class="layer-icon layer2">
+                    <i class="fas fa-brain"></i>
+                </div>
+                <div class="layer-title">
+                    <h3>Layer 2</h3>
+                    <div class="layer-status">等待中</div>
+                </div>
+            </div>
+            <div class="layer-progress">
+                <div class="layer-progress-bar progress-bar">
+                    <div class="layer-progress-fill"></div>
+                </div>
+                <div class="layer-progress-text progress-text">0%</div>
+            </div>
+            <div class="layer-details">
+                <p><strong>语义分析</strong></p>
+                <p>AI驱动的内容分类</p>
+                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                    <span class="chunk-count">分块数量: <strong>--</strong></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Layer 3 -->
+        <div class="layer-card" data-layer="3">
+            <div class="layer-header">
+                <div class="layer-icon layer3">
+                    <i class="fas fa-code"></i>
+                </div>
+                <div class="layer-title">
+                    <h3>Layer 3</h3>
+                    <div class="layer-status">等待中</div>
+                </div>
+            </div>
+            <div class="layer-progress">
+                <div class="layer-progress-bar progress-bar">
+                    <div class="layer-progress-fill"></div>
+                </div>
+                <div class="layer-progress-text progress-text">0%</div>
+            </div>
+            <div class="layer-details">
+                <p><strong>DITA转换</strong></p>
+                <p>生成标准DITA XML</p>
+                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                    <span class="conversion-rate">成功率: <strong>--</strong></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Layer 4 -->
+        <div class="layer-card" data-layer="4">
+            <div class="layer-header">
+                <div class="layer-icon layer4">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="layer-title">
+                    <h3>Layer 4</h3>
+                    <div class="layer-status">等待中</div>
+                </div>
+            </div>
+            <div class="layer-progress">
+                <div class="layer-progress-bar progress-bar">
+                    <div class="layer-progress-fill"></div>
+                </div>
+                <div class="layer-progress-text progress-text">0%</div>
+            </div>
+            <div class="layer-details">
+                <p><strong>质量保证</strong></p>
+                <p>验证与优化</p>
+                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                    <span class="quality-score">质量评分: <strong>--</strong></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 操作按钮 -->
+    <div class="action-buttons" id="actionButtons" style="display: none;">
+        <a class="btn-download" id="downloadBtn" style="display: none;">
+            <i class="fas fa-download"></i> 下载结果
+        </a>
+        <a class="btn-new" href="/">
+            <i class="fas fa-plus"></i> 新建转换
+        </a>
+    </div>
+    
+    <!-- 结果详情模态框 -->
+    <div class="modal fade" id="resultModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">处理结果详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- 动态内容 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/process.js') }}"></script>
+{% endblock %}

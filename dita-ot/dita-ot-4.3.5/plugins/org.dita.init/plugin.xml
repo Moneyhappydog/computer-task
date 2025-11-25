@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This file is part of the DITA Open Toolkit project.
+
+Copyright 2024 Jarno Elovirta
+
+See the accompanying LICENSE file for applicable license.
+-->
+<plugin id="org.dita.init" version="1.0.0">
+  <feature extension="init.template" file="samples/" desc="DITA garage samples and Ant build scripts"/>
+  <feature extension="init.template" file="startup/" desc="Startup template"/>
+</plugin>

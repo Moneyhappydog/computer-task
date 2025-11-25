@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}历史记录 - DITA Converter{% endblock %}
+
+{% block extra_css %}
+<style>
+    .history-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    
+    .history-header h1 {
+        font-size: 2rem;
+        color: #2c3e50;
+    }
+    
+    .history-list {
+        display: grid;
+        gap: 1.5rem;
+    }
+    
+    .history-item {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 1.5rem;
+        align-items: center;
+    }
+    
+    .history-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    }
+    
+    .history-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+    }
+    
+    .history-details {
+        flex: 1;
+    }
+    
+    .history-filename {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+    
+    .history-meta {
+        display: flex;
+        gap: 2rem;
+        font-size: 0.9rem;
+        color: #7f8c8d;
+    }
+    
+    .history-meta span {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .history-status {
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .history-status.completed {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .history-status.processing {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .history-status.error {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .history-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        color: #bdc3c7;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state h2 {
+        color: #7f8c8d;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="history-container">
+    <div class="history-header">
+        <h1><i class="fas fa-history"></i> 转换历史</h1>
+        <button class="btn btn-primary" onclick="clearHistory()">
+            <i class="fas fa-trash"></i> 清空历史
+        </button>
+    </div>
+    
+    <div class="history-list" id="historyList">
+        <!-- 历史记录将在这里动态加载 -->
+    </div>
+    
+    <div class="empty-state" id="emptyState" style="display: none;">
+        <i class="fas fa-inbox"></i>
+        <h2>暂无历史记录</h2>
+        <p>开始您的第一次文档转换吧！</p>
+        <a href="/" class="btn btn-primary" style="margin-top: 1rem;">
+            <i class="fas fa-plus"></i> 新建转换
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadHistory();
+});
+
+function loadHistory() {
+    const history = sessionHistory.getHistory();
+    const historyList = document.getElementById('historyList');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (history.length === 0) {
+        historyList.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    historyList.innerHTML = '';
+    
+    history.forEach(session => {
+        const item = createHistoryItem(session);
+        historyList.appendChild(item);
+    });
+}
+
+function createHistoryItem(session) {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    
+    const statusClass = session.status === 'completed' ? 'completed' : 
+                       session.status === 'processing' ? 'processing' : 'error';
+    const statusText = session.status === 'completed' ? '已完成' : 
+                      session.status === 'processing' ? '处理中' : '失败';
+    
+    div.innerHTML = `
+        <div class="history-icon">
+            <i class="fas fa-file-alt"></i>
+        </div>
+        <div class="history-details">
+            <div class="history-filename">${session.filename}</div>
+            <div class="history-meta">
+                <span>
+                    <i class="fas fa-calendar"></i>
+                    ${formatTimestamp(session.timestamp)}
+                </span>
+                <span>
+                    <i class="fas fa-hdd"></i>
+                    ${formatFileSize(session.filesize || 0)}
+                </span>
+            </div>
+        </div>
+        <div class="history-status ${statusClass}">
+            ${statusText}
+        </div>
+        <div class="history-actions">
+            ${session.status === 'completed' ? `
+                <button class="btn btn-icon" onclick="downloadResult('${session.session_id}')" title="下载结果">
+                    <i class="fas fa-download"></i>
+                </button>
+            ` : ''}
+            <button class="btn btn-icon" onclick="viewDetails('${session.session_id}')" title="查看详情">
+                <i class="fas fa-eye"></i>
+            </button>
+            <button class="btn btn-icon" onclick="deleteSession('${session.session_id}')" title="删除">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    return div;
+}
+
+function downloadResult(sessionId) {
+    window.location.href = `/api/download/result/${sessionId}`;
+}
+
+function viewDetails(sessionId) {
+    window.location.href = `/process?session_id=${sessionId}`;
+}
+
+function deleteSession(sessionId) {
+    if (confirm('确定要删除这条记录吗？')) {
+        sessionHistory.removeSession(sessionId);
+        loadHistory();
+        showNotification('已删除', 'success');
+    }
+}
+
+function clearHistory() {
+    if (confirm('确定要清空所有历史记录吗？')) {
+        sessionHistory.clearHistory();
+        loadHistory();
+        showNotification('已清空历史记录', 'success');
+    }
+}
+</script>
+{% endblock %}

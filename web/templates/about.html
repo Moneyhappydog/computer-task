@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}关于 - DITA Converter{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 2rem auto; padding: 2rem; text-align: center;">
+    <h1 style="color: #667eea; margin-bottom: 1rem;">DITA Converter</h1>
+    <p style="font-size: 1.2rem; color: #7f8c8d; margin-bottom: 2rem;">
+        智能文档转换工具
+    </p>
+    
+    <div style="background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);">
+        <h2 style="color: #2c3e50; margin-bottom: 1rem;">版本信息</h2>
+        <p style="color: #555; margin-bottom: 0.5rem;"><strong>版本:</strong> 1.0.0</p>
+        <p style="color: #555; margin-bottom: 0.5rem;"><strong>作者:</strong> Your Name</p>
+        <p style="color: #555; margin-bottom: 0.5rem;"><strong>许可证:</strong> MIT</p>
+        
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e9ecef;">
+        
+        <h2 style="color: #2c3e50; margin-bottom: 1rem;">技术栈</h2>
+        <ul style="list-style: none; padding: 0; color: #555;">
+            <li>Flask - Web框架</li>
+            <li>PaddleOCR - 文字识别</li>
+            <li>Python-docx - Word处理</li>
+            <li>PyPDF2 - PDF处理</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,515 @@
+{
+  "sessions": {
+    "0d98a7bb-bb4c-4d9b-800b-83da29355828": {
+      "id": "0d98a7bb-bb4c-4d9b-800b-83da29355828",
+      "filename": "0d98a7bb-bb4c-4d9b-800b-83da29355828_sample.docx",
+      "file_path": "uploads\\0d98a7bb-bb4c-4d9b-800b-83da29355828_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "1154e476-e4b8-40aa-ba9b-5641267f6494": {
+      "id": "1154e476-e4b8-40aa-ba9b-5641267f6494",
+      "filename": "1154e476-e4b8-40aa-ba9b-5641267f6494_sample.docx",
+      "file_path": "uploads\\1154e476-e4b8-40aa-ba9b-5641267f6494_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "1253e057-7f72-490c-abae-fb02b124c6cc": {
+      "id": "1253e057-7f72-490c-abae-fb02b124c6cc",
+      "filename": "1253e057-7f72-490c-abae-fb02b124c6cc_sample.docx",
+      "file_path": "uploads\\1253e057-7f72-490c-abae-fb02b124c6cc_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "1d454de5-89bc-4ba6-995b-eab3513f649d": {
+      "id": "1d454de5-89bc-4ba6-995b-eab3513f649d",
+      "filename": "1d454de5-89bc-4ba6-995b-eab3513f649d_sample.docx",
+      "file_path": "uploads\\1d454de5-89bc-4ba6-995b-eab3513f649d_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "2abcc59e-843c-4ff6-9853-2a2b639f8557": {
+      "id": "2abcc59e-843c-4ff6-9853-2a2b639f8557",
+      "filename": "2abcc59e-843c-4ff6-9853-2a2b639f8557_sample.docx",
+      "file_path": "uploads\\2abcc59e-843c-4ff6-9853-2a2b639f8557_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "3494f1c7-d0b1-487b-b91f-585c90acd06d": {
+      "id": "3494f1c7-d0b1-487b-b91f-585c90acd06d",
+      "filename": "3494f1c7-d0b1-487b-b91f-585c90acd06d_sample.docx",
+      "file_path": "uploads\\3494f1c7-d0b1-487b-b91f-585c90acd06d_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "708f05f4-ecb0-420b-8898-26ccd8522852": {
+      "id": "708f05f4-ecb0-420b-8898-26ccd8522852",
+      "filename": "708f05f4-ecb0-420b-8898-26ccd8522852_sample.docx",
+      "file_path": "uploads\\708f05f4-ecb0-420b-8898-26ccd8522852_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "84548039-98db-409c-b4b7-2aee9a85f8dc": {
+      "id": "84548039-98db-409c-b4b7-2aee9a85f8dc",
+      "filename": "84548039-98db-409c-b4b7-2aee9a85f8dc_sample.docx",
+      "file_path": "uploads\\84548039-98db-409c-b4b7-2aee9a85f8dc_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "8e6bf47d-a248-4ff7-98ae-e984b555646e": {
+      "id": "8e6bf47d-a248-4ff7-98ae-e984b555646e",
+      "filename": "8e6bf47d-a248-4ff7-98ae-e984b555646e_sample.docx",
+      "file_path": "uploads\\8e6bf47d-a248-4ff7-98ae-e984b555646e_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "b3edb654-b962-479f-aa67-967fc6dcbf3b": {
+      "id": "b3edb654-b962-479f-aa67-967fc6dcbf3b",
+      "filename": "b3edb654-b962-479f-aa67-967fc6dcbf3b_sample.docx",
+      "file_path": "uploads\\b3edb654-b962-479f-aa67-967fc6dcbf3b_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "d418d4c3-3924-4d32-9591-cc8a562f508c": {
+      "id": "d418d4c3-3924-4d32-9591-cc8a562f508c",
+      "filename": "d418d4c3-3924-4d32-9591-cc8a562f508c_sample.docx",
+      "file_path": "uploads\\d418d4c3-3924-4d32-9591-cc8a562f508c_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "e8dbf4d2-bce7-46ba-b1fc-d2948287b2d3": {
+      "id": "e8dbf4d2-bce7-46ba-b1fc-d2948287b2d3",
+      "filename": "e8dbf4d2-bce7-46ba-b1fc-d2948287b2d3_sample.docx",
+      "file_path": "uploads\\e8dbf4d2-bce7-46ba-b1fc-d2948287b2d3_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "e9659d6a-1be7-451b-acf6-94a22b1c5366": {
+      "id": "e9659d6a-1be7-451b-acf6-94a22b1c5366",
+      "filename": "e9659d6a-1be7-451b-acf6-94a22b1c5366_sample.docx",
+      "file_path": "uploads\\e9659d6a-1be7-451b-acf6-94a22b1c5366_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "f1b173c1-c692-40d9-9575-f140b057e7b6": {
+      "id": "f1b173c1-c692-40d9-9575-f140b057e7b6",
+      "filename": "f1b173c1-c692-40d9-9575-f140b057e7b6_sample.docx",
+      "file_path": "uploads\\f1b173c1-c692-40d9-9575-f140b057e7b6_sample.docx",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "5b946750-56f2-4e6e-82ac-5e02cfec5a72": {
+      "id": "5b946750-56f2-4e6e-82ac-5e02cfec5a72",
+      "filename": "5b946750-56f2-4e6e-82ac-5e02cfec5a72_First.pdf",
+      "file_path": "uploads\\5b946750-56f2-4e6e-82ac-5e02cfec5a72_First.pdf",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "87a09abe-1d7e-4877-af58-27e5bc1a280a": {
+      "id": "87a09abe-1d7e-4877-af58-27e5bc1a280a",
+      "filename": "87a09abe-1d7e-4877-af58-27e5bc1a280a_Lab_3_Instruction.pdf",
+      "file_path": "uploads\\87a09abe-1d7e-4877-af58-27e5bc1a280a_Lab_3_Instruction.pdf",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    },
+    "ee3277fe-cd44-4a7a-96ea-d7fdc4a49dc0": {
+      "id": "ee3277fe-cd44-4a7a-96ea-d7fdc4a49dc0",
+      "filename": "ee3277fe-cd44-4a7a-96ea-d7fdc4a49dc0_NeurIPS-2024-embodied-agent-interface-benchmarking-llms-for-embodied-decision-making-Paper-Datasets_and_Benchmarks_Track.pdf",
+      "file_path": "uploads\\ee3277fe-cd44-4a7a-96ea-d7fdc4a49dc0_NeurIPS-2024-embodied-agent-interface-benchmarking-llms-for-embodied-decision-making-Paper-Datasets_and_Benchmarks_Track.pdf",
+      "status": "pending",
+      "created_at": "2025-11-19T04:04:51.393579",
+      "current_layer": null,
+      "progress": 0,
+      "layers": {
+        "layer1": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer2": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer3": {
+          "status": "pending",
+          "progress": 0
+        },
+        "layer4": {
+          "status": "pending",
+          "progress": 0
+        }
+      },
+      "result": null,
+      "error": null,
+      "recovered": true
+    }
+  },
+  "updated_at": "2025-11-19T04:07:41.878447"
+}

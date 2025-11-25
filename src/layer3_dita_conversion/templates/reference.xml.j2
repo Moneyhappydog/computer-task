@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="{{ reference_id }}">
+  <title>{{ title }}</title>
+  
+  {% if short_description %}
+  <shortdesc>{{ short_description }}</shortdesc>
+  {% endif %}
+  
+  <refbody>
+    {% if introduction %}
+    <section>
+      <p>{{ introduction }}</p>
+    </section>
+    {% endif %}
+    
+    {% if properties %}
+    <properties>
+      <prophead>
+        <proptypehd>Property</proptypehd>
+        <propvaluehd>Value</propvaluehd>
+        <propdeschd>Description</propdeschd>
+      </prophead>
+      {% for prop in properties %}
+      <property>
+        <proptype>{{ prop.name }}</proptype>
+        <propvalue>{{ prop.value }}</propvalue>
+        <propdesc>{{ prop.description }}</propdesc>
+      </property>
+      {% endfor %}
+    </properties>
+    {% endif %}
+    
+    {% if table %}
+    <section>
+      <table>
+        <tgroup cols="{{ table.columns|length }}">
+          <thead>
+            <row>
+              {% for col in table.columns %}
+              <entry>{{ col }}</entry>
+              {% endfor %}
+            </row>
+          </thead>
+          <tbody>
+            {% for row in table.rows %}
+            <row>
+              {% for cell in row %}
+              <entry>{{ cell }}</entry>
+              {% endfor %}
+            </row>
+            {% endfor %}
+          </tbody>
+        </tgroup>
+      </table>
+    </section>
+    {% endif %}
+    
+    {% for section in sections %}
+    <section{% if section.id %} id="{{ section.id }}"{% endif %}>
+      {% if section.title %}
+      <title>{{ section.title }}</title>
+      {% endif %}
+      <p>{{ section.content }}</p>
+    </section>
+    {% endfor %}
+  </refbody>
+</reference>

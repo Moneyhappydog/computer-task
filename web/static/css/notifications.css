@@ -1,0 +1,100 @@
+/* ========================================
+   通知系统样式
+   ======================================== */
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    min-width: 300px;
+    max-width: 500px;
+    padding: 1rem 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 10000;
+    animation: slideIn 0.3s ease-out;
+    border-left: 4px solid;
+}
+
+.notification i {
+    font-size: 1.5rem;
+}
+
+.notification.notification-success {
+    border-left-color: #00d4aa;
+}
+
+.notification.notification-success i {
+    color: #00d4aa;
+}
+
+.notification.notification-error {
+    border-left-color: #ff6b6b;
+}
+
+.notification.notification-error i {
+    color: #ff6b6b;
+}
+
+.notification.notification-warning {
+    border-left-color: #feca57;
+}
+
+.notification.notification-warning i {
+    color: #feca57;
+}
+
+.notification.notification-info {
+    border-left-color: #48dbfb;
+}
+
+.notification.notification-info i {
+    color: #48dbfb;
+}
+
+.notification span {
+    flex: 1;
+    color: #2c3e50;
+}
+
+.notification.fade-out {
+    animation: slideOut 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+    }
+}

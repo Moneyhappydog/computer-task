@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}主页 - DITA Converter{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>
+            <i class="fas fa-magic"></i>
+            智能文档转换为DITA
+        </h1>
+        <p class="subtitle">
+            支持 PDF、Word 等格式，自动识别文档结构，生成符合DITA标准的XML文档
+        </p>
+    </section>
+    
+    <!-- 上传区域 -->
+    <section class="upload-section">
+        <div class="upload-card">
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.png,.jpg,.jpeg" style="display: none;">
+                
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                
+                <h2>拖放文件到这里</h2>
+                <p>或</p>
+                <button class="btn btn-primary" id="selectFileBtn">
+                    <i class="fas fa-folder-open"></i>
+                    选择文件
+                </button>
+                
+                <div class="upload-info">
+                    <p>支持格式: PDF, DOCX, DOC, PNG, JPG</p>
+                    <p>最大文件大小: 50MB</p>
+                </div>
+            </div>
+            
+            <!-- 文件信息 -->
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <div class="file-details">
+                    <i class="fas fa-file-alt file-icon"></i>
+                    <div class="file-meta">
+                        <div class="file-name" id="fileName"></div>
+                        <div class="file-size" id="fileSize"></div>
+                    </div>
+                    <button class="btn btn-icon" id="removeFileBtn" title="移除文件">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <!-- 上传进度 -->
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="uploadProgressBar"></div>
+                    </div>
+                    <div class="progress-text" id="uploadProgressText">上传中...</div>
+                </div>
+                
+                <!-- 开始处理按钮 -->
+                <button class="btn btn-success btn-large" id="startProcessBtn" style="display: none;">
+                    <i class="fas fa-play"></i>
+                    开始转换
+                </button>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 功能介绍 -->
+    <section class="features">
+        <h2>处理流程</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon layer1">
+                    <i class="fas fa-file-import"></i>
+                </div>
+                <h3>Layer 1: 预处理</h3>
+                <p>自动识别文档类型，提取结构化内容</p>
+                <ul class="feature-list">
+                    <li>PDF/Word 解析</li>
+                    <li>OCR 文字识别</li>
+                    <li>Markdown 转换</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon layer2">
+                    <i class="fas fa-brain"></i>
+                </div>
+                <h3>Layer 2: 语义分析</h3>
+                <p>AI驱动的内容分类与理解</p>
+                <ul class="feature-list">
+                    <li>智能文本分块</li>
+                    <li>Task/Concept/Reference 分类</li>
+                    <li>置信度评估</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon layer3">
+                    <i class="fas fa-code"></i>
+                </div>
+                <h3>Layer 3: DITA转换</h3>
+                <p>生成符合规范的DITA XML</p>
+                <ul class="feature-list">
+                    <li>模板驱动生成</li>
+                    <li>结构化数据提取</li>
+                    <li>XML验证</li>
+                </ul>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon layer4">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h3>Layer 4: 质量保证</h3>
+                <p>确保最高质量标准</p>
+                <ul class="feature-list">
+                    <li>DITA标准验证</li>
+                    <li>自定义规则检查</li>
+                    <li>智能错误修复</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 全局变量
+let selectedFile = null;
+let sessionId = null;
+
+// 页面加载完成
+document.addEventListener('DOMContentLoaded', function() {
+    initUpload();
+});
+
+// 初始化上传
+function initUpload() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const selectFileBtn = document.getElementById('selectFileBtn');
+    const removeFileBtn = document.getElementById('removeFileBtn');
+    const startProcessBtn = document.getElementById('startProcessBtn');
+    
+    // 选择文件按钮
+    selectFileBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // 文件选择
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            handleFileSelect(file);
+        }
+    });
+    
+    // 拖放
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            handleFileSelect(file);
+        }
+    });
+    
+    // 移除文件
+    removeFileBtn.addEventListener('click', () => {
+        resetUpload();
+    });
+    
+    // 开始处理
+    startProcessBtn.addEventListener('click', () => {
+        startProcessing();
+    });
+}
+
+// 处理文件选择
+function handleFileSelect(file) {
+    // 检查文件大小
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+        showError('文件大小超过50MB限制');
+        return;
+    }
+    
+    // 检查文件类型
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'image/png', 'image/jpeg'];
+    if (!allowedTypes.includes(file.type)) {
+        showError('不支持的文件类型');
+        return;
+    }
+    
+    selectedFile = file;
+    
+    // 显示文件信息
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = formatFileSize(file.size);
+    
+    document.getElementById('uploadArea').style.display = 'none';
+    document.getElementById('fileInfo').style.display = 'block';
+    
+    // 上传文件
+    uploadFile(file);
+}
+
+// 上传文件
+async function uploadFile(file) {
+    const uploadProgress = document.getElementById('uploadProgress');
+    const uploadProgressBar = document.getElementById('uploadProgressBar');
+    const uploadProgressText = document.getElementById('uploadProgressText');
+    
+    uploadProgress.style.display = 'block';
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/api/upload/', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            sessionId = data.session_id;
+            uploadProgressBar.style.width = '100%';
+            uploadProgressText.textContent = '上传完成！';
+            
+            setTimeout(() => {
+                uploadProgress.style.display = 'none';
+                document.getElementById('startProcessBtn').style.display = 'block';
+            }, 500);
+        } else {
+            showError(data.error || '上传失败');
+            resetUpload();
+        }
+    } catch (error) {
+        console.error('上传错误:', error);
+        showError('上传失败: ' + error.message);
+        resetUpload();
+    }
+}
+
+// 开始处理
+function startProcessing() {
+    if (!sessionId) {
+        showError('会话ID无效');
+        return;
+    }
+    
+    // 跳转到处理页面
+    window.location.href = `/process?session_id=${sessionId}`;
+}
+
+// 重置上传
+function resetUpload() {
+    selectedFile = null;
+    sessionId = null;
+    
+    document.getElementById('fileInput').value = '';
+    document.getElementById('uploadArea').style.display = 'block';
+    document.getElementById('fileInfo').style.display = 'none';
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// 显示错误
+function showError(message) {
+    alert('错误: ' + message);
+}
+</script>
+{% endblock %}

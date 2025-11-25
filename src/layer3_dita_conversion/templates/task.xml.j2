@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="{{ task_id }}">
+  <title>{{ title }}</title>
+  
+  {% if short_description %}
+  <shortdesc>{{ short_description }}</shortdesc>
+  {% endif %}
+  
+  <taskbody>
+    {% if prerequisites %}
+    <prereq>
+      {% if prerequisites is string %}
+      <p>{{ prerequisites }}</p>
+      {% else %}
+      <ul>
+        {% for prereq in prerequisites %}
+        <li>{{ prereq }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </prereq>
+    {% endif %}
+    
+    {% if context %}
+    <context>
+      <p>{{ context }}</p>
+    </context>
+    {% endif %}
+    
+    <steps>
+      {% for step in steps %}
+      <step>
+        <cmd>{{ step.command }}</cmd>
+        {% if step.info %}
+        <info>{{ step.info }}</info>
+        {% endif %}
+        {% if step.example %}
+        <stepxmp>{{ step.example }}</stepxmp>
+        {% endif %}
+      </step>
+      {% endfor %}
+    </steps>
+    
+    {% if result %}
+    <result>
+      <p>{{ result }}</p>
+    </result>
+    {% endif %}
+    
+    {% if example %}
+    <example>
+      <title>Example</title>
+      <p>{{ example }}</p>
+    </example>
+    {% endif %}
+  </taskbody>
+</task>

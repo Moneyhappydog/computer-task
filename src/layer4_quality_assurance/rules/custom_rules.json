@@ -1,0 +1,36 @@
+{
+    "terminology": {
+        "glossary": {
+            "API": "Application Programming Interface",
+            "URL": "Uniform Resource Locator",
+            "HTTP": "Hypertext Transfer Protocol"
+        },
+        "replacements": {
+            "click on": "click",
+            "in order to": "to",
+            "utilize": "use"
+        }
+    },
+    "style_guide": {
+        "title_max_length": 100,
+        "shortdesc_max_length": 150,
+        "max_steps": 15,
+        "max_nesting_depth": 5
+    },
+    "custom_checks": [
+        {
+            "name": "no_future_tense",
+            "description": "避免使用将来时态",
+            "severity": "info",
+            "pattern": "\\bwill\\b",
+            "message": "避免使用'will'，使用现在时态"
+        },
+        {
+            "name": "no_passive_voice",
+            "description": "避免被动语态",
+            "severity": "info",
+            "pattern": "\\b(is|are|was|were)\\s+\\w+ed\\b",
+            "message": "考虑使用主动语态"
+        }
+    ]
+}
