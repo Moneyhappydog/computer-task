@@ -49,7 +49,7 @@ def create_app(config=None):
     )
     
     # 注册WebSocket事件处理器
-    register_socketio_events(socketio)
+    register_socketio_events(app, socketio)
     
     # 注册蓝图
     register_blueprints(app)
@@ -62,11 +62,12 @@ def create_app(config=None):
     
     return app
 
-def register_socketio_events(socketio):
+def register_socketio_events(app, socketio):
     """
-    注册WebSocket事件处理器
+    注册SocketIO事件处理器
     
     Args:
+        app: Flask应用实例
         socketio: SocketIO实例
     """
     try:

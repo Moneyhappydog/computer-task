@@ -13,6 +13,7 @@ from .content_structurer import ContentStructurer
 from .constraint_engine import ConstraintEngine
 from .template_renderer import TemplateRenderer
 from .xml_validator import XMLValidator
+from .errors import ErrorHandler, DITAConversionError, ConverterError, StructureError, TemplateError, ConstraintError
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +38,10 @@ class DITAConverter:
         
         self.use_ai = use_ai
         self.max_fix_iterations = max_fix_iterations
+        self.templates_dir = templates_dir
         
-        # 初始化各组件
+        # 初始化各组件（除了content_structurer，它会在每次转换时重新创建）
         self.template_selector = TemplateSelector(templates_dir)
-        self.content_structurer = ContentStructurer(use_ai)
         self.constraint_engine = ConstraintEngine()
         self.template_renderer = TemplateRenderer(templates_dir)
         self.xml_validator = XMLValidator()
@@ -88,20 +89,41 @@ class DITAConverter:
             }
         }
         
+        # 创建错误处理器
+        error_handler = ErrorHandler()
+        
         try:
             # Step 1: 模板选择
             logger.info("\n[Step 1/5] 选择模板...")
-            template_info = self._step1_select_template(content_type)
-            result['metadata']['template'] = template_info
-            logger.info(f"   ✓ 选择: {template_info['template_file']}")
+            try:
+                template_info = self._step1_select_template(content_type)
+                result['metadata']['template'] = template_info
+                logger.info(f"   ✓ 选择: {template_info['template_file']}")
+            except Exception as e:
+                error_handler.add_error(ConverterError(
+                    f"模板选择失败: {str(e)}",
+                    "TEMPLATE_SELECTION_FAILED"
+                ))
+                raise
             
             # Step 2: 内容结构化
             logger.info("\n[Step 2/5] 结构化内容...")
-            structured_data = self._step2_structure_content(
-                content, title, content_type, metadata
-            )
-            result['structured_data'] = structured_data
-            logger.info(f"   ✓ 结构化完成")
+            try:
+                structured_data = self._step2_structure_content(
+                    content, title, content_type, metadata
+                )
+                result['structured_data'] = structured_data
+                logger.info(f"   ✓ 结构化完成")
+            except StructureError as e:
+                error_handler.add_error(e)
+                logger.warning(f"   ⚠️  结构化内容失败: {e}")
+                raise
+            except Exception as e:
+                error_handler.add_error(ConverterError(
+                    f"结构化内容失败: {str(e)}",
+                    "CONTENT_STRUCTURING_FAILED"
+                ))
+                raise
             
             # Step 3: 约束验证
             logger.info("\n[Step 3/5] 验证约束...")
@@ -111,7 +133,13 @@ class DITAConverter:
             
             if not constraint_result['is_valid']:
                 logger.warning(f"   ⚠️  发现 {len(constraint_result['errors'])} 个约束错误")
-                result['warnings'].extend(constraint_result['errors'])
+                # 将约束错误转换为标准化的警告
+                for err_msg in constraint_result['errors']:
+                    error_handler.add_error(ConstraintError(
+                        err_msg,
+                        "STRUCTURE_VALIDATION_FAILED",
+                        is_warning=True
+                    ))
                 
                 # 尝试修复结构
                 structured_data = self._fix_structure(
@@ -124,11 +152,22 @@ class DITAConverter:
             
             # Step 4: 模板渲染
             logger.info("\n[Step 4/5] 渲染模板...")
-            dita_xml = self._step4_render_template(
-                structured_data, content_type
-            )
-            result['dita_xml'] = dita_xml
-            logger.info(f"   ✓ 渲染完成: {len(dita_xml)} 字符")
+            try:
+                dita_xml = self._step4_render_template(
+                    structured_data, content_type
+                )
+                result['dita_xml'] = dita_xml
+                logger.info(f"   ✓ 渲染完成: {len(dita_xml)} 字符")
+            except TemplateError as e:
+                error_handler.add_error(e)
+                logger.error(f"   ❌ 模板渲染失败: {e}")
+                raise
+            except Exception as e:
+                error_handler.add_error(ConverterError(
+                    f"模板渲染失败: {str(e)}",
+                    "TEMPLATE_RENDERING_FAILED"
+                ))
+                raise
             
             # Step 5: XML验证 + 修复循环
             logger.info("\n[Step 5/5] XML验证...")
@@ -143,23 +182,36 @@ class DITAConverter:
                 logger.info("   ✓ XML验证通过")
             else:
                 logger.warning(f"   ⚠️  XML验证失败: {len(validation_result['errors'])} 个错误")
-                result['errors'] = validation_result['errors']
+                # 将XML验证错误转换为标准化的错误
+                for err in validation_result['errors']:
+                    error_handler.add_error(DITAConversionError(
+                        err if isinstance(err, str) else str(err),
+                        "XML_VALIDATION_FAILED",
+                        "XMLValidator"
+                    ))
             
             # 汇总统计
             logger.info("\n" + "="*70)
             logger.info("✅ DITA转换完成")
             logger.info(f"   状态: {'成功' if result['success'] else '失败'}")
             logger.info(f"   迭代次数: {result['metadata']['iterations']}")
-            logger.info(f"   错误数: {len(result['errors'])}")
-            logger.info(f"   警告数: {len(result['warnings'])}")
+            logger.info(f"   错误数: {error_handler.get_results()['error_count']}")
+            logger.info(f"   警告数: {error_handler.get_results()['warning_count']}")
             logger.info("="*70)
             
         except Exception as e:
-            logger.error(f"❌ 转换过程出错: {e}", exc_info=True)
-            result['errors'].append({
-                'type': 'ConversionError',
-                'message': str(e)
-            })
+            if not error_handler.get_results()['has_errors']:
+                # 如果错误处理器中没有错误，添加一个通用错误
+                logger.error(f"❌ 转换过程出错: {e}", exc_info=True)
+                error_handler.add_error(ConverterError(
+                    f"转换过程出错: {str(e)}",
+                    "GENERAL_CONVERSION_ERROR"
+                ))
+            raise
+        finally:
+            # 收集错误和警告
+            result['errors'] = [err['message'] for err in error_handler.get_results()['errors']]
+            result['warnings'] = [warn['message'] for warn in error_handler.get_results()['warnings']]
         
         return result
     
@@ -175,7 +227,9 @@ class DITAConverter:
         metadata: Optional[Dict]
     ) -> Dict:
         """Step 2: 内容结构化"""
-        return self.content_structurer.structure_content(
+        # 每次结构化时创建新的ContentStructurer实例，确保ID唯一性
+        content_structurer = ContentStructurer(self.use_ai)
+        return content_structurer.structure_content(
             content, title, content_type, metadata
         )
     
@@ -271,12 +325,12 @@ class DITAConverter:
                 if content_type == 'Task':
                     # 确保有steps
                     if 'steps' not in fixed_data or not fixed_data['steps']:
-                        fixed_data['steps'] = [{'command': 'Complete the task'}]
+                        fixed_data['steps'] = [{'cmd': 'Complete the task'}]
                     
-                    # 确保每个step有command
+                    # 确保每个step有cmd
                     for step in fixed_data.get('steps', []):
-                        if 'command' not in step and 'cmd' not in step:
-                            step['command'] = 'Perform action'
+                        if 'cmd' not in step:
+                            step['cmd'] = 'Perform action'
                 
                 elif content_type == 'Concept':
                     # 确保有introduction或sections

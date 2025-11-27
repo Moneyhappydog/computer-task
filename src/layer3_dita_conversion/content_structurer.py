@@ -8,6 +8,7 @@ import json
 import re
 
 from src.utils.ai_service import AIService
+from .errors import StructureError, DITAConversionError
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class ContentStructurer:
         """
         self.use_ai = use_ai
         self.ai_service = AIService() if use_ai else None
+        self.used_ids = set()  # 跟踪已使用的ID，确保唯一性
         
         logger.info(f"✅ 内容结构化器初始化完成 (AI: {use_ai})")
     
@@ -49,23 +51,47 @@ class ContentStructurer:
         
         # 根据类型选择结构化方法
         if content_type == 'Task':
-            return self._structure_task(content, title, metadata)
+            result = self._structure_task(content, title, metadata)
         elif content_type == 'Concept':
-            return self._structure_concept(content, title, metadata)
+            result = self._structure_concept(content, title, metadata)
         elif content_type == 'Reference':
-            return self._structure_reference(content, title, metadata)
+            result = self._structure_reference(content, title, metadata)
         else:
-            raise ValueError(f"不支持的内容类型: {content_type}")
+            raise StructureError(
+                f"不支持的内容类型: {content_type}",
+                "UNSUPPORTED_CONTENT_TYPE"
+            )
+        
+        # 确保生成的ID唯一
+        if result:
+            self._ensure_unique_ids(result)
+        
+        return result
     
     def _structure_task(self, content: str, title: str, metadata: Dict) -> Dict:
         """结构化Task类型内容"""
         
+        structured_data = None
+        
         if self.use_ai:
-            prompt = self._build_task_prompt(content, title)
-            response = self.ai_service.generate(prompt)
-            structured_data = self._parse_json_response(response)
-        else:
-            # 规则提取（备用方案）
+            try:
+                prompt = self._build_task_prompt(content, title)
+                response = self.ai_service.generate(prompt)
+                structured_data = self._parse_json_response(response)
+                
+                # 验证结构化结果是否有效
+                if not structured_data or 'steps' not in structured_data:
+                    raise StructureError(
+                        "结构化结果无效，缺少必要字段",
+                        "INVALID_STRUCTURED_DATA"
+                    )
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ LLM结构化Task失败: {e}，自动降级到规则提取")
+                structured_data = None
+        
+        # 如果AI结构化失败或未使用AI，使用规则提取
+        if structured_data is None:
             structured_data = self._extract_task_by_rules(content, title)
         
         # 验证必需字段
@@ -80,11 +106,27 @@ class ContentStructurer:
     def _structure_concept(self, content: str, title: str, metadata: Dict) -> Dict:
         """结构化Concept类型内容"""
         
+        structured_data = None
+        
         if self.use_ai:
-            prompt = self._build_concept_prompt(content, title)
-            response = self.ai_service.generate(prompt)
-            structured_data = self._parse_json_response(response)
-        else:
+            try:
+                prompt = self._build_concept_prompt(content, title)
+                response = self.ai_service.generate(prompt)
+                structured_data = self._parse_json_response(response)
+                
+                # 验证结构化结果是否有效
+                if not structured_data:
+                    raise StructureError(
+                        "结构化结果无效",
+                        "INVALID_STRUCTURED_DATA"
+                    )
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ LLM结构化Concept失败: {e}，自动降级到规则提取")
+                structured_data = None
+        
+        # 如果AI结构化失败或未使用AI，使用规则提取
+        if structured_data is None:
             structured_data = self._extract_concept_by_rules(content, title)
         
         structured_data.setdefault('concept_id', self._generate_id(title))
@@ -98,11 +140,27 @@ class ContentStructurer:
     def _structure_reference(self, content: str, title: str, metadata: Dict) -> Dict:
         """结构化Reference类型内容"""
         
+        structured_data = None
+        
         if self.use_ai:
-            prompt = self._build_reference_prompt(content, title)
-            response = self.ai_service.generate(prompt)
-            structured_data = self._parse_json_response(response)
-        else:
+            try:
+                prompt = self._build_reference_prompt(content, title)
+                response = self.ai_service.generate(prompt)
+                structured_data = self._parse_json_response(response)
+                
+                # 验证结构化结果是否有效
+                if not structured_data:
+                    raise StructureError(
+                        "结构化结果无效",
+                        "INVALID_STRUCTURED_DATA"
+                    )
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ LLM结构化Reference失败: {e}，自动降级到规则提取")
+                structured_data = None
+        
+        # 如果AI结构化失败或未使用AI，使用规则提取
+        if structured_data is None:
             structured_data = self._extract_reference_by_rules(content, title)
         
         structured_data.setdefault('reference_id', self._generate_id(title))
@@ -131,7 +189,7 @@ class ContentStructurer:
   "context": "背景说明（可选）",
   "steps": [
     {{
-      "command": "步骤的主要操作",
+      "cmd": "步骤的主要操作",
       "info": "步骤的补充说明（可选）",
       "example": "示例（可选）"
     }}
@@ -141,7 +199,7 @@ class ContentStructurer:
 }}
 
 注意:
-1. 每个步骤的command必须是明确的操作指令
+1. 每个步骤的cmd必须是明确的操作指令
 2. steps至少包含1个步骤
 3. 如果没有某个字段的信息就省略
 """
@@ -276,7 +334,7 @@ class ContentStructurer:
             match = re.match(numbered_pattern, line)
             if match:
                 steps.append({
-                    'command': match.group(2).strip(),
+                    'cmd': match.group(2).strip(),
                     'info': None
                 })
         
@@ -287,7 +345,7 @@ class ContentStructurer:
                 match = re.match(bullet_pattern, line)
                 if match:
                     steps.append({
-                        'command': match.group(1).strip(),
+                        'cmd': match.group(1).strip(),
                         'info': None
                     })
         
@@ -381,7 +439,47 @@ class ContentStructurer:
         if id_str and not id_str[0].isalpha():
             id_str = 'id_' + id_str
         
-        return id_str or 'unnamed'
+        # 确保ID唯一
+        base_id = id_str or 'unnamed'
+        unique_id = base_id
+        counter = 1
+        
+        while unique_id in self.used_ids:
+            unique_id = f"{base_id}_{counter}"
+            counter += 1
+        
+        self.used_ids.add(unique_id)
+        return unique_id
+    
+    def _ensure_unique_ids(self, structured_data: Dict):
+        """
+        确保结构化数据中的所有ID都是唯一的
+        
+        Args:
+            structured_data: 结构化数据字典
+        """
+        # 检查主要ID字段
+        for id_field in ['task_id', 'concept_id', 'reference_id']:
+            if id_field in structured_data:
+                original_id = structured_data[id_field]
+                if original_id in self.used_ids:
+                    # 生成新的唯一ID
+                    new_id = self._generate_id(original_id)
+                    structured_data[id_field] = new_id
+                else:
+                    self.used_ids.add(original_id)
+        
+        # 检查sections中的ID
+        if 'sections' in structured_data:
+            for section in structured_data['sections']:
+                if 'id' in section:
+                    original_id = section['id']
+                    if original_id in self.used_ids:
+                        # 生成新的唯一ID
+                        new_id = self._generate_id(original_id)
+                        section['id'] = new_id
+                    else:
+                        self.used_ids.add(original_id)
 
 
 # 测试代码

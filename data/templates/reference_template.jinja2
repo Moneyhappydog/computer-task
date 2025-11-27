@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="{{ id }}">
+  <title>{{ title }}</title>
+  {% if shortdesc %}
+  <shortdesc>{{ shortdesc }}</shortdesc>
+  {% endif %}
+  <refbody>
+    {% if sections %}
+    {% for section in sections %}
+    <section>
+      <title>{{ section.title }}</title>
+      <p>{{ section.content }}</p>
+    </section>
+    {% endfor %}
+    {% else %}
+    <p>{{ content }}</p>
+    {% endif %}
+    {% if properties %}
+    <properties>
+      {% for prop in properties %}
+      <property>
+        <proptype>{{ prop.type }}</proptype>
+        <propvalue>{{ prop.value }}</propvalue>
+      </property>
+      {% endfor %}
+    </properties>
+    {% endif %}
+    {% if tables %}
+    {% for table in tables %}
+    <table>
+      <title>{{ table.title }}</title>
+      <tgroup cols="{{ table.cols }}">
+        <thead>
+          <row>
+            {% for header in table.headers %}
+            <entry>{{ header }}</entry>
+            {% endfor %}
+          </row>
+        </thead>
+        <tbody>
+          {% for row in table.rows %}
+          <row>
+            {% for cell in row %}
+            <entry>{{ cell }}</entry>
+            {% endfor %}
+          </row>
+          {% endfor %}
+        </tbody>
+      </tgroup>
+    </table>
+    {% endfor %}
+    {% endif %}
+  </refbody>
+</reference>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="{{ id }}">
+  <title>{{ title }}</title>
+  {% if shortdesc %}
+  <shortdesc>{{ shortdesc }}</shortdesc>
+  {% endif %}
+  <conbody>
+    {% if purpose %}
+    <p>{{ purpose }}</p>
+    {% endif %}
+    {% if sections %}
+    {% for section in sections %}
+    <section>
+      <title>{{ section.title }}</title>
+      <p>{{ section.content }}</p>
+    </section>
+    {% endfor %}
+    {% else %}
+    <p>{{ content }}</p>
+    {% endif %}
+    {% if examples %}
+    {% for example in examples %}
+    <example>
+      <title>{{ example.title }}</title>
+      <p>{{ example.content }}</p>
+    </example>
+    {% endfor %}
+    {% endif %}
+  </conbody>
+</concept>

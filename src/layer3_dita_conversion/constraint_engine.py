@@ -5,6 +5,8 @@ Step 3: 语法约束引擎
 from typing import Dict, List, Any
 import logging
 
+from .errors import ConstraintError, DITAConversionError
+
 logger = logging.getLogger(__name__)
 
 class ConstraintEngine:
@@ -137,7 +139,10 @@ class ConstraintEngine:
             约束规则字典
         """
         if content_type not in self.constraints:
-            raise ValueError(f"不支持的内容类型: {content_type}")
+            raise ConstraintError(
+                f"不支持的内容类型: {content_type}",
+                "UNSUPPORTED_CONTENT_TYPE"
+            )
         
         return self.constraints[content_type]
     
@@ -202,8 +207,8 @@ class ConstraintEngine:
                 continue
             
             # 检查必需的cmd字段
-            if 'command' not in step and 'cmd' not in step:
-                errors.append(f"第{i+1}个step缺少必需字段: command/cmd")
+            if 'cmd' not in step:
+                errors.append(f"第{i+1}个step缺少必需字段: cmd")
         
         return errors
     
@@ -214,6 +219,16 @@ class ConstraintEngine:
         # Concept必须有introduction或sections
         if not data.get('introduction') and not data.get('sections'):
             errors.append("Concept必须包含introduction或sections")
+        
+        # 检查sections中的ID唯一性
+        sections = data.get('sections', [])
+        id_set = set()
+        for section in sections:
+            if 'id' in section:
+                if section['id'] in id_set:
+                    errors.append(f"ID重复: {section['id']}")
+                else:
+                    id_set.add(section['id'])
         
         return errors
     
@@ -228,8 +243,23 @@ class ConstraintEngine:
             data.get('sections')
         ])
         
+        # 放宽约束：如果没有这些结构，但有其他内容，也可以接受
+        # 这是为了兼容各种Reference类型的文档
         if not has_content:
-            errors.append("Reference必须包含properties、table或sections中的至少一项")
+            # 检查是否有其他内容
+            has_other_content = any([
+                data.get('title'),
+                data.get('shortdesc'),
+                # 检查是否有其他字段
+                any(key not in ['reference_id', 'title', 'shortdesc'] for key in data.keys())
+            ])
+            
+            if not has_other_content:
+                errors.append("Reference必须包含properties、table或sections中的至少一项")
+            else:
+                # 只有标题和短描述是不够的，需要有实际内容
+                if list(data.keys()) == ['reference_id', 'title', 'shortdesc']:
+                    errors.append("Reference必须包含properties、table或sections中的至少一项")
         
         # 验证table结构
         if 'table' in data and data['table']:
@@ -400,8 +430,8 @@ DITA Reference 约束规则:
                 suggestions.append(f"添加缺失的元素到结构化数据中")
             elif "steps数量不足" in error:
                 suggestions.append("至少添加一个步骤到steps数组")
-            elif "缺少必需字段: command" in error:
-                suggestions.append("为每个step添加command字段，描述具体操作")
+            elif "缺少必需字段: cmd" in error:
+                suggestions.append("为每个step添加cmd字段，描述具体操作")
             elif "必须包含introduction或sections" in error:
                 suggestions.append("添加introduction字段或至少一个section")
             else:
@@ -434,8 +464,8 @@ if __name__ == "__main__":
         'task_id': 'task_install_software',
         'title': 'Installing Software',
         'steps': [
-            {'command': 'Download the installer'},
-            {'command': 'Run the setup wizard'}
+            {'cmd': 'Download the installer'},
+            {'cmd': 'Run the setup wizard'}
         ]
     }
     

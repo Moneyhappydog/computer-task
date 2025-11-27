@@ -8,6 +8,8 @@ import logging
 from jinja2 import Environment, FileSystemLoader, Template, TemplateError
 import re
 
+from .errors import TemplateError, DITAConversionError
+
 logger = logging.getLogger(__name__)
 
 class TemplateRenderer:
@@ -78,7 +80,11 @@ class TemplateRenderer:
             
         except TemplateError as e:
             logger.error(f"❌ 模板渲染失败: {e}")
-            raise
+            raise TemplateError(
+                f"模板渲染失败: {str(e)}",
+                "TEMPLATE_RENDERING_FAILED",
+                details={"template_name": template_name, "error": str(e)}
+            )
     
     def render_task(self, data: Dict) -> str:
         """渲染Task类型"""
@@ -203,7 +209,11 @@ class TemplateRenderer:
         template_path = self.templates_dir / template_name
         
         if not template_path.exists():
-            raise FileNotFoundError(f"模板不存在: {template_path}")
+            raise TemplateError(
+                f"模板不存在: {template_path}",
+                "TEMPLATE_NOT_FOUND",
+                details={"template_name": template_name, "path": str(template_path)}
+            )
         
         with open(template_path, 'r', encoding='utf-8') as f:
             return f.read()
@@ -234,16 +244,16 @@ if __name__ == "__main__":
         'context': 'Python is required for running the application',
         'steps': [
             {
-                'command': 'Download Python from python.org',
+                'cmd': 'Download Python from python.org',
                 'info': 'Choose the version matching your operating system'
             },
             {
-                'command': 'Run the installer',
+                'cmd': 'Run the installer',
                 'info': 'Make sure to check "Add Python to PATH"',
                 'example': 'python-3.11.0-installer.exe'
             },
             {
-                'command': 'Verify the installation',
+                'cmd': 'Verify the installation',
                 'info': 'Open a terminal and run: python --version'
             }
         ],

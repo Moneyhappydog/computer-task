@@ -1,11 +1,12 @@
 # ===================================================================
-# DITA转换器项目依赖 - 已解决所有已知冲突
-# 最后更新: 2025-11-18
-# Python版本: >=3.10,<3.13 (transformers 4.41+ 推荐)
+# DITA转换器项目依赖 - 已解决 Marker/Transformers 冲突
+# 最后更新: 2025-11-26
+# Python版本: >=3.10,<3.13
 # ===================================================================
 
 # ===== Layer 1: 核心PDF处理 =====
 marker-pdf==0.2.17          # PDF智能处理（包含Surya OCR）
+pdfplumber>=0.10.0          # PDF表格提取
 pypandoc==1.13              # Word文档转换（需要pandoc系统包）
 python-docx==1.1.0          # DOCX文件读取
 PyPDF2==3.0.1               # PDF基础操作
@@ -13,10 +14,12 @@ pdf2image==1.17.0           # PDF转图像（需要poppler）
 pytesseract==0.3.10         # Tesseract OCR Python包装器
 
 # ===== Layer 2: 深度学习与NLP =====
-# ⚠️ 关键约束：surya-ocr要求torch>=2.3.0, transformers>=4.41.0
-torch>=2.3.0,<3.0.0         # PyTorch深度学习框架
-transformers>=4.41.0,<5.0.0 # Hugging Face Transformers
-spacy>=3.8.0,<4.0.0         # NLP处理库（支持pydantic 2.x）
+# ⚠️ 关键约束：固定 transformers 版本以兼容 marker-pdf 0.2.17
+torch>=2.3.0,<2.4.0         # PyTorch深度学习框架
+transformers==4.44.2        # 🔒 锁定版本避免与 marker 冲突
+tokenizers==0.19.1          # 🔒 与 transformers 4.44.2 兼容
+safetensors>=0.4.0,<1.0.0   # 安全张量存储
+spacy>=3.8.0,<4.0.0         # NLP处理库
 scikit-learn>=1.3.0,<2.0.0  # 传统机器学习工具
 
 # ===== Layer 3: XML处理与模板 =====
@@ -27,12 +30,12 @@ xmlschema>=2.5.0            # XML Schema验证
 # ===== Layer 4: LLM集成 =====
 openai>=1.6.0               # OpenAI API客户端
 anthropic>=0.8.0            # Anthropic Claude API客户端
-langchain>=0.1.20,<0.3.0    # LLM应用框架
+langchain>=0.1.20,<0.3.0    # LLM应用框架（兼容 transformers 4.44.2）
 langsmith>=0.1.0,<0.2.0     # LangChain追踪工具
 
 # ===== Layer 5: 数据验证与配置 =====
-# ⚠️ 关键约束：marker-pdf(pdftext)要求pydantic>=2.7.1
 pydantic>=2.7.1,<3.0.0      # 数据验证与设置管理
+pydantic-settings>=2.0.0    # Pydantic 设置管理
 python-dotenv>=1.0.0        # 环境变量管理
 PyYAML>=6.0.0               # YAML配置文件解析
 
@@ -41,22 +44,20 @@ loguru>=0.7.0               # 简洁日志库
 tqdm>=4.66.0                # 进度条显示
 requests>=2.31.0            # HTTP请求库
 pillow>=10.0.0              # 图像处理（surya-ocr要求）
+numpy>=1.24.0,<2.0.0        # 数值计算库
 
-# ===== Layer 7: 开发与测试工具 =====
+# ===== Layer 7: Web Framework =====
+Flask==3.1.2                # Web框架
+Flask-CORS==6.0.1           # CORS支持
+Flask-SocketIO==5.5.1       # WebSocket支持
+python-socketio==5.14.3     # SocketIO客户端
+python-engineio==4.12.3     # Engine.IO
+eventlet==0.40.3            # 异步网络库
+werkzeug>=3.0.0,<4.0.0      # Flask WSGI工具
+
+# ===== Layer 8: 开发与测试工具 =====
 pytest>=7.4.0               # 测试框架
 pytest-cov>=4.1.0           # 测试覆盖率
 black>=23.12.0              # 代码格式化
-flake8>=7.0.0                 # 代码风格检查
+flake8>=7.0.0               # 代码风格检查
 mypy>=1.7.0                 # 静态类型检查
-
-pdfplumber>=0.10.0
-
-# Web Framework
-Flask==3.0.0
-Flask-CORS==4.0.0
-Flask-SocketIO==5.3.5
-python-socketio==5.10.0
-eventlet==0.33.3
-
-# 文件处理
-werkzeug==3.0.1

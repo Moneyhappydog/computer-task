@@ -247,6 +247,126 @@ class QAManager:
         logger.info("  ✅ 所有质量检查通过")
         return True
     
+    def _merge_dita_documents(self, results: List[Dict]) -> Dict[str, Any]:
+        """
+        合并多个DITA文档为一个完整的DITA文档
+        
+        Args:
+            results: 批量处理结果列表
+            
+        Returns:
+            包含合并后DITA XML和验证结果的字典
+        """
+        logger.info("🔄 开始合并DITA文档...")
+        
+        # 提取所有成功的DITA XML内容
+        successful_results = [r for r in results if r['success']]
+        
+        if not successful_results:
+            logger.warning("⚠️ 没有成功的DITA文档可以合并")
+            return None
+        
+        # 合并文档内容
+        merged_content = []
+        document_ids = set()
+        
+        for i, result in enumerate(successful_results, 1):
+            dita_xml = result['final_dita_xml']
+            
+            try:
+                # 尝试从不同位置获取文档标题
+                title = ""
+                if 'title' in result:
+                    title = result['title']
+                elif 'metadata' in result and 'title' in result['metadata']:
+                    title = result['metadata']['title']
+                elif 'filename' in result:
+                    # 从文件名提取标题
+                    title = result['filename'].replace('.dita', '').split('_')[-1]
+                elif 'quality_report' in result and 'title' in result['quality_report']:
+                    title = result['quality_report']['title']
+                
+                # 如果仍然没有标题，使用默认名称
+                if not title:
+                    title = f"Section_{i}"
+                
+                # 生成唯一的文档ID
+                doc_id = "".join(c if c.isalnum() else '_' for c in title)[:30]
+                
+                # 确保ID唯一
+                counter = 1
+                unique_doc_id = doc_id
+                while unique_doc_id in document_ids:
+                    unique_doc_id = f"{doc_id}_{counter}"
+                    counter += 1
+                document_ids.add(unique_doc_id)
+                
+                # 移除XML声明，避免重复
+                if dita_xml.startswith('<?xml'):
+                    xml_end = dita_xml.find('?>')
+                    if xml_end != -1:
+                        dita_xml = dita_xml[xml_end+2:].strip()
+                
+                # 提取对应类型的主体内容，避免嵌套的根元素
+                import re
+                body_content = ""
+                
+                # 检查文档类型并提取相应的主体内容
+                if '<conbody>' in dita_xml:
+                    # Concept类型
+                    body_match = re.search(r'<conbody>(.*?)</conbody>', dita_xml, re.DOTALL)
+                    if body_match:
+                        body_content = body_match.group(1)
+                elif '<refbody>' in dita_xml:
+                    # Reference类型
+                    body_match = re.search(r'<refbody>(.*?)</refbody>', dita_xml, re.DOTALL)
+                    if body_match:
+                        body_content = body_match.group(1)
+                elif '<taskbody>' in dita_xml:
+                    # Task类型
+                    body_match = re.search(r'<taskbody>(.*?)</taskbody>', dita_xml, re.DOTALL)
+                    if body_match:
+                        body_content = body_match.group(1)
+                else:
+                    # 如果没有识别的主体元素，使用整个内容（移除根元素标签）
+                    root_start = dita_xml.find('>')
+                    root_end = dita_xml.rfind('</')
+                    if root_start != -1 and root_end != -1:
+                        body_content = dita_xml[root_start+1:root_end].strip()
+                    else:
+                        body_content = dita_xml
+                
+                # 将提取的内容添加到section中
+                section_content = f'<section id="{unique_doc_id}"><title>{title}</title>{body_content}</section>'
+                merged_content.append(section_content)
+            except Exception as e:
+                logger.warning(f"⚠️ 处理文档 {i} 时出错: {str(e)}")
+                import traceback
+                logger.debug(f"错误详情: {traceback.format_exc()}")
+        
+        # 创建合并后的DITA文档（使用concept类型作为主文档）
+        merged_content_str = "\n    ".join(merged_content)
+        merged_dita = '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="merged_complete_document">
+  <title>合并后的完整文档</title>
+  <conbody>
+    {}
+  </conbody>
+</concept>'''.format(merged_content_str)
+        
+        logger.info(f"✅ 成功合并 {len(merged_content)} 个文档")
+        
+        # 对合并后的文档进行质量检查
+        logger.info("🔍 对合并后的文档进行质量检查...")
+        merged_result = self.process(
+            dita_xml=merged_dita,
+            content_type='Concept',
+            processing_metadata={'source': 'merged_document'}
+        )
+        
+        return merged_result
+
     def process_batch(
         self,
         dita_documents: List[Dict],
@@ -296,6 +416,39 @@ class QAManager:
             'results': results,
             'summary': self._generate_batch_summary(results)
         }
+        
+        # 生成并保存合成版完整文档
+        if output_dir and success_count > 0:
+            merged_result = self._merge_dita_documents(results)
+            if merged_result:
+                # 保存合并后的文档
+                merged_file = output_dir / "merged_complete_document.dita"
+                with open(merged_file, 'w', encoding='utf-8') as f:
+                    f.write(merged_result['final_dita_xml'])
+                logger.info(f"💾 合成版完整文档已保存: {merged_file}")
+                
+                # 保存合并文档的质量报告
+                doc_id = merged_result['quality_report']['document_id']
+                
+                # 保存JSON报告
+                json_file = output_dir / f"merged_complete_report.json"
+                self.quality_reporter.save_report(
+                    merged_result['quality_report'],
+                    json_file,
+                    include_xml=True,
+                    dita_xml=merged_result['final_dita_xml']
+                )
+                
+                # 保存HTML报告
+                html_file = output_dir / f"merged_complete_report.html"
+                self.quality_reporter.save_html_report(
+                    merged_result['quality_report'],
+                    html_file
+                )
+                
+                logger.info("📊 合成版文档的质量报告已生成")
+                batch_result['merged_document_path'] = str(merged_file)
+                batch_result['merged_document_result'] = merged_result
         
         logger.info("\n" + "="*70)
         logger.info("✅ 批量质量保证完成")

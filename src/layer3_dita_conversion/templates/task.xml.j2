@@ -31,7 +31,9 @@
     <steps>
       {% for step in steps %}
       <step>
-        <cmd>{{ step.command }}</cmd>
+        {% if step.cmd %}
+        <cmd>{{ step.cmd }}</cmd>
+        {% endif %}
         {% if step.info %}
         <info>{{ step.info }}</info>
         {% endif %}

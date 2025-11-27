@@ -7,6 +7,8 @@ import logging
 from lxml import etree
 import re
 
+from .errors import ErrorHandler, XMLValidationError, DITAConversionError
+
 logger = logging.getLogger(__name__)
 
 class XMLValidator:

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE task PUBLIC "-//OASIS//DTD DITA Task//EN" "task.dtd">
+<task id="{{ id }}">
+  <title>{{ title }}</title>
+  {% if shortdesc %}
+  <shortdesc>{{ shortdesc }}</shortdesc>
+  {% endif %}
+  <taskbody>
+    {% if prereq %}
+    <prereq>{{ prereq }}</prereq>
+    {% endif %}
+    {% if context %}
+    <context>{{ context }}</context>
+    {% endif %}
+    {% if steps %}
+    <steps>
+      {% for step in steps %}
+      <step>
+        <cmd>{{ step.cmd }}</cmd>
+        {% if step.info %}
+        <info>{{ step.info }}</info>
+        {% endif %}
+        {% if step.stepresult %}
+        <stepresult>{{ step.stepresult }}</stepresult>
+        {% endif %}
+      </step>
+      {% endfor %}
+    </steps>
+    {% else %}
+    <steps>
+      <step>
+        <cmd>{{ content }}</cmd>
+      </step>
+    </steps>
+    {% endif %}
+    {% if result %}
+    <result>{{ result }}</result>
+    {% endif %}
+    {% if example %}
+    <example>
+      <title>示例</title>
+      <p>{{ example }}</p>
+    </example>
+    {% endif %}
+  </taskbody>
+</task>
