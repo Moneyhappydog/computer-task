@@ -40,7 +40,7 @@ class ConversionProcessor {
         this.socket.on('progress_update', (data) => {
             if (data.session_id === this.sessionId) {
                 console.log('📊 Socket 进度更新:', data);
-                this.updateProgress(data.progress, data.message);
+                this.updateProgress(data.progress, data.message, data.layers);
             }
         });
 
@@ -123,8 +123,8 @@ class ConversionProcessor {
                     filenameEl.textContent = data.filename;
                 }
 
-                // 更新进度
-                this.updateProgress(data.progress, data.message);
+                // 更新进度（传递层数据）
+                this.updateProgress(data.progress, data.message, data.layers);
 
                 // 检查是否完成
                 if (data.status === 'completed') {
@@ -138,14 +138,15 @@ class ConversionProcessor {
         }
     }
 
-    // 更新进度显示
-    updateProgress(progress, message) {
-        console.log(`📊 进度更新: ${progress}% - ${message}`);
+    // 更新进度
+    updateProgress(progress, message, layersData) {
+        console.log('📊 更新进度:', progress, '% -', message);
+        console.log('📋 层进度数据:', layersData);
 
-        // 更新总进度
-        const totalProgressEl = document.querySelector('.total-progress');
-        if (totalProgressEl) {
-            totalProgressEl.textContent = `${progress}%`;
+        // 更新进度文本
+        const progressText = document.querySelector('.overall-progress-percentage');
+        if (progressText) {
+            progressText.textContent = `${progress}%`;
         }
 
         // 更新总进度条
@@ -167,66 +168,71 @@ class ConversionProcessor {
             }
         }
 
-        // 更新各层进度（基于实际进度）
-        this.updateLayerProgress(progress);
+        // 更新各层进度（使用真实的层进度数据）
+        this.updateLayerProgress(layersData);
     }
 
     // 更新各层进度
-    updateLayerProgress(totalProgress) {
+    updateLayerProgress(layersData) {
+        // 如果没有层数据，不重置现有进度
+        if (!layersData) {
+            return;
+        }
+
         const layers = document.querySelectorAll('.layer-card');
-        
+
         layers.forEach((layer, index) => {
             const layerNum = index + 1;
-            let layerProgress = 0;
-            
-            // 根据总进度计算各层进度
-            if (totalProgress <= 20) {
-                // 第一层：0-20%
-                layerProgress = totalProgress * 5;
-            } else if (totalProgress <= 40) {
-                // 第二层：20-40%
-                if (index === 0) layerProgress = 100; // 第一层完成
-                else if (index === 1) layerProgress = (totalProgress - 20) * 5;
-            } else if (totalProgress <= 70) {
-                // 第三层：40-70%
-                if (index <= 1) layerProgress = 100; // 前两层完成
-                else if (index === 2) layerProgress = (totalProgress - 40) * 3.33;
-            } else if (totalProgress <= 90) {
-                // 第四层：70-90%
-                if (index <= 2) layerProgress = 100; // 前三层完成
-                else if (index === 3) layerProgress = (totalProgress - 70) * 5;
-            } else {
-                // 完成：90-100%
-                layerProgress = 100;
-            }
+            const layerKey = `layer${layerNum}`;
 
-            const layerBar = layer.querySelector('.layer-progress-fill');
-            const layerText = layer.querySelector('.progress-text');
-            const layerStatus = layer.querySelector('.layer-status');
+            // 获取真实的层进度数据
+            const layerData = layersData ? layersData[layerKey] : null;
 
-            if (layerBar) {
-                layerBar.style.width = `${layerProgress}%`;
-            }
-            if (layerText) {
-                layerText.textContent = `${Math.round(layerProgress)}%`;
-            }
+            // 只在有层数据时更新
+            if (layerData) {
+                let layerProgress = layerData.progress;
+                let layerMessage = layerData.message;
+                let layerStatus = layerData.status;
 
-            // 更新状态文字和样式
-            if (layerStatus) {
-                if (layerProgress === 0) {
-                    layerStatus.textContent = '等待中';
-                    layerStatus.className = 'layer-status';
-                    layer.classList.remove('active', 'completed');
-                } else if (layerProgress < 100) {
-                    layerStatus.textContent = '处理中...';
-                    layerStatus.className = 'layer-status processing';
-                    layer.classList.add('active');
-                    layer.classList.remove('completed');
-                } else {
-                    layerStatus.textContent = '✓ 已完成';
-                    layerStatus.className = 'layer-status completed';
-                    layer.classList.remove('active');
-                    layer.classList.add('completed');
+                const layerBar = layer.querySelector('.layer-progress-fill');
+                const layerText = layer.querySelector('.progress-text');
+                const statusEl = layer.querySelector('.layer-status');
+
+                if (layerBar) {
+                    layerBar.style.width = `${layerProgress}%`;
+                }
+                if (layerText) {
+                    layerText.textContent = `${Math.round(layerProgress)}%`;
+                }
+
+                // 更新状态文字和样式
+                if (statusEl) {
+                    if (layerProgress === 0) {
+                        statusEl.textContent = '等待中';
+                        statusEl.className = 'layer-status';
+                        layer.classList.remove('active', 'completed', 'error');
+                    } else if (layerProgress < 100) {
+                        statusEl.textContent = '处理中...';
+                        statusEl.className = 'layer-status processing';
+                        layer.classList.add('active');
+                        layer.classList.remove('completed', 'error');
+                    } else if (layerStatus === 'error') {
+                        statusEl.textContent = '✗ 失败';
+                        statusEl.className = 'layer-status error';
+                        layer.classList.remove('active', 'completed');
+                        layer.classList.add('error');
+                    } else {
+                        statusEl.textContent = '✓ 已完成';
+                        statusEl.className = 'layer-status completed';
+                        layer.classList.remove('active', 'error');
+                        layer.classList.add('completed');
+                    }
+                }
+
+                // 更新层消息
+                const layerMessageEl = layer.querySelector('.layer-message');
+                if (layerMessageEl) {
+                    layerMessageEl.textContent = layerMessage;
                 }
             }
         });
@@ -237,7 +243,7 @@ class ConversionProcessor {
         try {
             // 获取各层结果
             const layers = ['layer1', 'layer2', 'layer3', 'layer4'];
-            
+
             for (let i = 0; i < layers.length; i++) {
                 const response = await fetch(`/api/layer/${this.sessionId}/${layers[i]}`);
                 if (response.ok) {
@@ -271,7 +277,7 @@ class ConversionProcessor {
                 break;
             case 3: // DITA转换层
                 if (data.conversion_stats) {
-                    const successRate = data.conversion_stats.success_rate || 0;
+                    const successRate = Math.round((data.conversion_stats.success_rate || 0) * 100);
                     statsEl.innerHTML = `<span class="conversion-rate">成功率: <strong>${successRate}%</strong></span>`;
                 }
                 break;
@@ -294,8 +300,13 @@ class ConversionProcessor {
             this.statusInterval = null;
         }
 
-        // 更新进度到100%
-        this.updateProgress(100, '转换完成！');
+        // 更新进度到100%，并保持各层的完成状态
+        this.updateProgress(100, '转换完成！', {
+            'layer1': { 'status': 'completed', 'progress': 100, 'message': '✅ 预处理完成' },
+            'layer2': { 'status': 'completed', 'progress': 100, 'message': '✅ 语义分析完成' },
+            'layer3': { 'status': 'completed', 'progress': 100, 'message': '✅ DITA转换完成' },
+            'layer4': { 'status': 'completed', 'progress': 100, 'message': '✅ 质量保证完成' }
+        });
 
         // 更新层统计信息
         await this.updateLayerStats();
@@ -330,6 +341,174 @@ class ConversionProcessor {
 
         // 添加完成状态
         document.body.classList.add('conversion-complete');
+
+        // 加载各层结果文件
+        await this.loadLayerResults();
+    }
+
+    // 加载各层结果文件
+    async loadLayerResults() {
+        console.log('📂 加载结果文件...');
+
+        for (let layer = 1; layer <= 4; layer++) {
+            try {
+                const response = await fetch(`/api/layer/${this.sessionId}/layer${layer}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    this.displayLayerResults(layer, data);
+                }
+            } catch (error) {
+                console.error(`❌ 加载Layer ${layer}结果失败:`, error);
+            }
+        }
+    }
+
+    // 显示层结果文件
+    displayLayerResults(layer, layerData) {
+        const resultsContainer = document.getElementById(`results-layer${layer}`);
+        if (!resultsContainer) return;
+
+        // 清空现有内容
+        resultsContainer.innerHTML = '';
+
+        // 根据层类型显示不同的结果
+        switch (layer) {
+            case 1:
+                // Layer 1: 预处理结果
+                this.displayPreprocessingResults(resultsContainer, layerData);
+                break;
+            case 2:
+                // Layer 2: 语义分析结果
+                this.displaySemanticResults(resultsContainer, layerData);
+                break;
+            case 3:
+                // Layer 3: DITA转换结果
+                this.displayDITAResults(resultsContainer, layerData);
+                break;
+            case 4:
+                // Layer 4: 质量保证结果
+                this.displayQualityResults(resultsContainer, layerData);
+                break;
+        }
+    }
+
+    // 显示预处理结果
+    displayPreprocessingResults(container, data) {
+        // Layer 1: 预处理结果 - 显示markdown文件
+        const fileItem = document.createElement('div');
+        fileItem.className = 'result-file-item';
+        fileItem.innerHTML = `
+            <div class="file-icon"><span class="material-icons">description</span></div>
+            <div class="file-info">
+                <div class="file-name">预处理后的Markdown</div>
+                <div class="file-size">${data.markdown_length ? this.formatFileSize(data.markdown_length) : '未知'}</div>
+            </div>
+            <div class="file-actions">
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer1'">下载</button>
+            </div>
+        `;
+        container.appendChild(fileItem);
+    }
+
+    // 显示语义分析结果
+    displaySemanticResults(container, data) {
+        // Layer 2: 语义分析结果 - 显示分块结果
+        const fileItem = document.createElement('div');
+        fileItem.className = 'result-file-item';
+        fileItem.innerHTML = `
+            <div class="file-icon"><span class="material-icons">category</span></div>
+            <div class="file-info">
+                <div class="file-name">语义分析结果 (${data.total_chunks || 0} 个分块)</div>
+            </div>
+            <div class="file-actions">
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer2'">下载</button>
+            </div>
+        `;
+        container.appendChild(fileItem);
+    }
+
+    // 显示DITA转换结果
+    displayDITAResults(container, data) {
+        // Layer 3: DITA转换结果 - 显示DITA文件
+        const fileItem = document.createElement('div');
+        fileItem.className = 'result-file-item';
+        fileItem.innerHTML = `
+            <div class="file-icon"><span class="material-icons">code</span></div>
+            <div class="file-info">
+                <div class="file-name">DITA转换结果 (${data.success || 0} 个成功)</div>
+            </div>
+            <div class="file-actions">
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer3'">下载</button>
+            </div>
+        `;
+        container.appendChild(fileItem);
+    }
+
+    // 显示质量保证结果
+    displayQualityResults(container, data) {
+        // Layer 4: 质量保证结果 - 显示质量评估报告
+        const fileItem = document.createElement('div');
+        fileItem.className = 'result-file-item';
+        fileItem.innerHTML = `
+            <div class="file-icon"><span class="material-icons">check_circle</span></div>
+            <div class="file-info">
+                <div class="file-name">质量评估报告</div>
+                <div class="file-size">${data.total ? this.formatFileSize(data.total) : '未知'}</div>
+            </div>
+            <div class="file-actions">
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer4'">下载</button>
+            </div>
+        `;
+        container.appendChild(fileItem);
+    }
+
+    // 下载文件
+    async downloadFile(fileType, sessionId, index = 0) {
+        try {
+            const response = await fetch(`/api/process/download/${sessionId}?type=${fileType}&index=${index}`);
+            if (!response.ok) throw new Error('下载失败');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            // 设置文件名
+            let fileName = `${sessionId}_${fileType}`;
+            switch (fileType) {
+                case 'markdown':
+                    fileName += '.md';
+                    break;
+                case 'semantic':
+                    fileName += '.json';
+                    break;
+                case 'dita':
+                    fileName += `_${index + 1}.xml`;
+                    break;
+                case 'quality':
+                    fileName += '.json';
+                    break;
+                default:
+                    fileName += '.txt';
+            }
+
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('❌ 下载失败:', error);
+            this.showNotification('下载失败', 'error');
+        }
+    }
+
+    // 格式化文件大小
+    formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
+        else return (bytes / 1048576).toFixed(2) + ' MB';
     }
 
     // 添加层卡片点击事件
@@ -348,7 +527,7 @@ class ConversionProcessor {
         try {
             const layerNames = ['layer1', 'layer2', 'layer3', 'layer4'];
             const layerTitles = ['预处理层', '语义分析层', 'DITA转换层', '质量保证层'];
-            
+
             const response = await fetch(`/api/layer/${this.sessionId}/${layerNames[layerNum - 1]}`);
             if (!response.ok) {
                 throw new Error('获取层详情失败');
@@ -393,81 +572,73 @@ class ConversionProcessor {
     generateModalContent(data) {
         let content = '';
 
-        // 基本信息部分
-        if (data.file_type) {
+        // 预处理结果
+        if (data.layer_name === 'layer1' && data.markdown) {
             content += `
                 <div class="result-section">
-                    <h6>文件信息</h6>
-                    <div class="result-stats">
-                        <div class="stat-item">
-                            <div class="stat-value">${data.file_type}</div>
-                            <div class="stat-label">文件类型</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">${data.word_count || 0}</div>
-                            <div class="stat-label">字数统计</div>
-                        </div>
+                    <h6>预处理结果</h6>
+                    <div class="result-content">
+                        <pre>${this.escapeHtml(data.markdown.substring(0, 1000))}...</pre>
                     </div>
                 </div>
             `;
         }
 
-        // 预处理结果
-        if (data.markdown_content) {
-            content += `
-                <div class="result-section">
-                    <h6>预处理结果</h6>
-                    <div class="result-content">${this.escapeHtml(data.markdown_content.substring(0, 1000))}${data.markdown_content.length > 1000 ? '...' : ''}</div>
-                </div>
-            `;
-        }
-
-        // 语义分析结果
-        if (data.chunks && data.chunks.length > 0) {
+        // 语义分块结果
+        if (data.layer_name === 'layer2' && data.chunks) {
             content += `
                 <div class="result-section">
                     <h6>语义分块结果</h6>
                     <div class="result-stats">
                         <div class="stat-item">
-                            <div class="stat-value">${data.chunks.length}</div>
+                            <div class="stat-value">${data.total_chunks}</div>
                             <div class="stat-label">分块数量</div>
                         </div>
                     </div>
-                    <div class="result-content">${data.chunks.slice(0, 3).map((chunk, i) => `块${i+1}: ${this.escapeHtml(chunk.content.substring(0, 100))}...`).join('\n\n')}</div>
+                    <div class="result-content">${data.chunks.slice(0, 3).map((chunk, i) => `块${i + 1}: ${this.escapeHtml(chunk.content.substring(0, 100))}...`).join('\n\n')}</div>
                 </div>
             `;
         }
 
         // DITA转换结果
-        if (data.dita_files && data.dita_files.length > 0) {
+        if (data.layer_name === 'layer3' && data.total > 0) {
             content += `
                 <div class="result-section">
                     <h6>DITA转换结果</h6>
                     <div class="result-stats">
                         <div class="stat-item">
-                            <div class="stat-value">${data.dita_files.length}</div>
+                            <div class="stat-value">${data.total}</div>
                             <div class="stat-label">DITA文件</div>
                         </div>
-                        ${data.conversion_stats ? `<div class="stat-item"><div class="stat-value">${data.conversion_stats.success_rate}%</div><div class="stat-label">成功率</div></div>` : ''}
+                        <div class="stat-item">
+                            <div class="stat-value">${data.success_rate}%</div>
+                            <div class="stat-label">成功率</div>
+                        </div>
                     </div>
                 </div>
             `;
         }
 
         // 质量评估结果
-        if (data.quality_score) {
+        if (data.layer_name === 'layer4' && data.total > 0) {
             content += `
                 <div class="result-section">
                     <h6>质量评估结果</h6>
                     <div class="result-stats">
                         <div class="stat-item">
-                            <div class="stat-value">${data.quality_score.overall || 0}/100</div>
+                            <div class="stat-value">${data.avg_quality_score || 0}/100</div>
                             <div class="stat-label">总体评分</div>
                         </div>
-                        ${data.quality_score.structure ? `<div class="stat-item"><div class="stat-value">${data.quality_score.structure}/100</div><div class="stat-label">结构评分</div></div>` : ''}
-                        ${data.quality_score.content ? `<div class="stat-item"><div class="stat-value">${data.quality_score.content}/100</div><div class="stat-label">内容评分</div></div>` : ''}
+                        <div class="stat-item">
+                            <div class="stat-value">${data.success}</div>
+                            <div class="stat-label">成功</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${data.failed}</div>
+                            <div class="stat-label">失败</div>
+                        </div>
                     </div>
-                    ${data.issues && data.issues.length > 0 ? `<div class="result-content">发现的问题：${data.issues.map(issue => `• ${this.escapeHtml(issue)}`).join('\n')}</div>` : ''}
+                    ${data.summary ? `<div class="result-content">${this.escapeHtml(JSON.stringify(data.summary, null, 2))}</div>` : ''}
                 </div>
             `;
         }

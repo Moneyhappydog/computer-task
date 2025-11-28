@@ -32,3 +32,5 @@ conda activate venv; python test_layer2.py
 
 conda activate venv ; python test_integration.py "D:\codeC\VsCodeP\dita-converter\uploads\2023CVPR-CoMFormer.pdf" "D:\codeC\VsCodeP\dita-converter\uploads\0d98a7bb-bb4c-4d9b-800b-83da29355828_sample.docx"
 
+
+conda activate venv ; python d:\codeC\VsCodeP\dita-converter\run_web.py 

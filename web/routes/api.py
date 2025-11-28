@@ -174,14 +174,14 @@ def convert_file(session_id):
                     app.logger.info(f"后台转换开始: {session_id}")
                     
                     # 导入处理流水线
-                    from web.services.pipeline import ProcessingPipeline
+                    from web.services.pipeline import get_pipeline
                     
                     # 创建输出目录
                     output_dir = Path(app.config['OUTPUT_FOLDER']) / session_id
                     output_dir.mkdir(parents=True, exist_ok=True)
                     
-                    # 初始化流水线
-                    pipeline = ProcessingPipeline()
+                    # 获取流水线单例
+                    pipeline = get_pipeline()
                     
                     # 定义进度回调函数
                     def progress_callback(stage, progress, data):
@@ -189,6 +189,21 @@ def convert_file(session_id):
                         session_info['current_stage'] = stage
                         session_info['stage_progress'] = progress
                         session_info['stage_data'] = data
+                        
+                        # 初始化layers信息
+                        if 'layers' not in session_info:
+                            session_info['layers'] = {
+                                'layer1': {'status': 'pending', 'progress': 0, 'message': ''},
+                                'layer2': {'status': 'pending', 'progress': 0, 'message': ''},
+                                'layer3': {'status': 'pending', 'progress': 0, 'message': ''},
+                                'layer4': {'status': 'pending', 'progress': 0, 'message': ''}
+                            }
+                        
+                        # 更新当前层的进度信息
+                        if stage in ['layer1', 'layer2', 'layer3', 'layer4']:
+                            session_info['layers'][stage]['progress'] = progress
+                            session_info['layers'][stage]['message'] = data.get('message', f'{stage} 处理中...')
+                            session_info['layers'][stage]['status'] = 'completed' if progress == 100 else 'processing'
                         
                         # 计算总进度
                         stage_weights = {
@@ -199,9 +214,17 @@ def convert_file(session_id):
                             'complete': 100
                         }
                         
-                        base_progress = stage_weights.get(stage, 0)
-                        stage_progress = progress / 100 * (stage_weights.get(stage, 0) - list(stage_weights.values())[list(stage_weights.keys()).index(stage) - 1] if list(stage_weights.keys()).index(stage) > 0 else 0)
-                        total_progress = min(100, base_progress + stage_progress)
+                        if stage == 'error':
+                            total_progress = 0
+                        else:
+                            base_progress = stage_weights.get(stage, 0)
+                            if stage in stage_weights:
+                                stage_index = list(stage_weights.keys()).index(stage)
+                                prev_progress = list(stage_weights.values())[stage_index - 1] if stage_index > 0 else 0
+                                stage_progress = progress / 100 * (base_progress - prev_progress)
+                                total_progress = min(100, prev_progress + stage_progress)
+                            else:
+                                total_progress = base_progress
                         
                         session_info['progress'] = int(total_progress)
                         session_info['message'] = data.get('message', f'{stage} 处理中...')
@@ -215,7 +238,8 @@ def convert_file(session_id):
                                 'progress': int(total_progress),
                                 'stage_progress': progress,
                                 'message': data.get('message'),
-                                'data': data
+                                'data': data,
+                                'layers': session_info['layers']
                             })
                         except Exception as socket_error:
                             app.logger.warning(f"WebSocket发送失败: {socket_error}")
@@ -240,13 +264,22 @@ def convert_file(session_id):
                         session_info['message'] = '🎉 转换完成！'
                         session_info['output_dir'] = str(output_dir / 'final_dita')
                         
+                        # 确保所有层都显示为100%完成
+                        session_info['layers'] = {
+                            'layer1': {'status': 'completed', 'progress': 100, 'message': '✅ 预处理完成'},
+                            'layer2': {'status': 'completed', 'progress': 100, 'message': '✅ 语义分析完成'},
+                            'layer3': {'status': 'completed', 'progress': 100, 'message': '✅ DITA转换完成'},
+                            'layer4': {'status': 'completed', 'progress': 100, 'message': '✅ 质量保证完成'}
+                        }
+                        
                         # 发送完成通知
                         try:
                             from web.app import socketio
                             socketio.emit('conversion_complete', {
                                 'session_id': session_id,
                                 'output_dir': session_info['output_dir'],
-                                'result': result
+                                'result': result,
+                                'layers': session_info['layers']
                             })
                         except Exception as socket_error:
                             app.logger.warning(f"WebSocket发送失败: {socket_error}")
@@ -485,6 +518,14 @@ def get_status(session_id):
         
         session_info = sessions[session_id]
         
+        # 获取层进度信息
+        layers_info = session_info.get('layers', {
+            'layer1': {'status': 'pending', 'progress': 0, 'message': ''},
+            'layer2': {'status': 'pending', 'progress': 0, 'message': ''},
+            'layer3': {'status': 'pending', 'progress': 0, 'message': ''},
+            'layer4': {'status': 'pending', 'progress': 0, 'message': ''}
+        })
+        
         return jsonify({
             'success': True,
             'session_id': session_id,
@@ -494,7 +535,8 @@ def get_status(session_id):
             'filename': session_info.get('filename', ''),
             'file_size': session_info.get('file_size', 0),
             'upload_time': session_info.get('upload_time', ''),
-            'error': session_info.get('error', '')
+            'error': session_info.get('error', ''),
+            'layers': layers_info
         })
         
     except Exception as e:
@@ -516,6 +558,19 @@ def download_result(session_id):
     Returns:
         文件下载
     """
+    
+@bp.route('/download/layer/<session_id>/<layer>', methods=['GET'])
+def download_layer_result(session_id, layer):
+    """
+    下载指定层的转换结果
+    
+    Args:
+        session_id: 会话ID
+        layer: 层名称（如layer1, layer2, layer3, layer4）
+        
+    Returns:
+        文件下载
+    """
     try:
         if session_id not in sessions:
             return jsonify({
@@ -532,24 +587,129 @@ def download_result(session_id):
                 'error': '转换尚未完成'
             }), 400
         
-        # 获取输出文件路径
-        output_path = session_info.get('output_path')
-        
-        if not output_path or not Path(output_path).exists():
+        # 验证层名称
+        if layer not in ['layer1', 'layer2', 'layer3', 'layer4']:
             return jsonify({
                 'success': False,
-                'error': '输出文件不存在'
+                'error': '无效的层名称'
+            }), 400
+        
+        # 获取主输出目录
+        main_output_dir = Path(session_info.get('output_dir'))
+        
+        if not main_output_dir or not main_output_dir.exists():
+            return jsonify({
+                'success': False,
+                'error': '输出目录不存在'
             }), 404
         
-        # 发送文件
-        return send_file(
-            output_path,
+        # 创建临时ZIP文件
+        import tempfile
+        import zipfile
+        
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
+            tmp_zip_path = tmp_file.name
+        
+        # 创建ZIP文件
+        with zipfile.ZipFile(tmp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # 尝试获取层特定的输出目录
+            layer_output_dir = main_output_dir / layer
+            
+            if layer_output_dir.exists() and layer_output_dir.is_dir():
+                # 如果层有专门的目录，压缩该目录下的所有文件
+                for root, dirs, files in os.walk(layer_output_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # 相对路径从层目录开始
+                        arcname = os.path.relpath(file_path, layer_output_dir)
+                        zipf.write(file_path, arcname)
+            else:
+                # 如果没有层特定目录，检查会话中的层结果数据
+                result = session_info.get('result', {})
+                layers = result.get('layers', {})
+                
+                if layer in layers:
+                    layer_data = layers[layer]
+                    
+                    # 根据不同层处理结果数据
+                    if layer == 'layer1':
+                        # 层1：预处理层，输出Markdown
+                        markdown_content = layer_data.get('markdown', '')
+                        if markdown_content:
+                            # 创建临时Markdown文件
+                            with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as md_file:
+                                md_file.write(markdown_content)
+                                temp_md_path = md_file.name
+                            
+                            # 添加到ZIP
+                            zipf.write(temp_md_path, f"{layer}_preprocessed.md")
+                            
+                            # 删除临时文件
+                            os.unlink(temp_md_path)
+                    
+                    elif layer == 'layer2':
+                        # 层2：语义分析层，输出分块结果
+                        chunks = layer_data.get('chunks', [])
+                        if chunks:
+                            # 创建临时JSON文件存储分块
+                            import json
+                            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as json_file:
+                                json.dump(chunks, json_file, ensure_ascii=False, indent=2)
+                                temp_json_path = json_file.name
+                            
+                            # 添加到ZIP
+                            zipf.write(temp_json_path, f"{layer}_chunks.json")
+                            
+                            # 删除临时文件
+                            os.unlink(temp_json_path)
+                    
+                    elif layer == 'layer3':
+                        # 层3：DITA转换层，可能有XML文件
+                        # 检查是否有DITA文件
+                        dita_files = list(main_output_dir.glob('*.dita')) + list(main_output_dir.glob('**/*.dita'))
+                        for dita_file in dita_files:
+                            arcname = os.path.relpath(dita_file, main_output_dir)
+                            zipf.write(dita_file, arcname)
+                    
+                    elif layer == 'layer4':
+                        # 层4：质量保证层，可能有报告文件
+                        # 检查是否有质量报告文件
+                        report_files = list(main_output_dir.glob('*quality*.json')) + list(main_output_dir.glob('*report*.json'))
+                        for report_file in report_files:
+                            arcname = os.path.relpath(report_file, main_output_dir)
+                            zipf.write(report_file, arcname)
+                
+                # 如果没有找到任何文件或数据
+                if zipf.namelist() == []:
+                    # 创建一个空的说明文件
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as info_file:
+                        info_file.write(f"层 {layer} 没有生成可下载的文件")
+                        temp_info_path = info_file.name
+                    
+                    zipf.write(temp_info_path, "info.txt")
+                    os.unlink(temp_info_path)
+        
+        # 发送ZIP文件
+        response = send_file(
+            tmp_zip_path,
             as_attachment=True,
-            download_name=f"converted_{session_info['filename']}.zip"
+            download_name=f"{layer}_result_{session_info['filename']}.zip",
+            mimetype='application/zip'
         )
         
+        # 删除临时文件
+        @response.call_on_close
+        def remove_temp_file():
+            try:
+                os.unlink(tmp_zip_path)
+            except Exception as e:
+                current_app.logger.error(f"删除临时文件失败: {e}")
+        
+        return response
+        
     except Exception as e:
-        current_app.logger.error(f"下载失败: {e}")
+        current_app.logger.error(f"下载层结果失败: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

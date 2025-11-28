@@ -20,7 +20,7 @@ class FileRouter:
         logger.info("🚀 初始化文件路由器...")
         
         self.processors = {
-            'pdf': PDFProcessor(),
+            'pdf': PDFProcessor(use_marker=True, use_ocr=True),
             'word': WordProcessor(),
             'ocr': OCRProcessor()
         }

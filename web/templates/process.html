@@ -192,29 +192,156 @@
     }
     
     .layer-details {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 1rem;
-        font-size: 0.85rem;
-        color: #555;
-    }
-    
-    .layer-details p {
-        margin: 0.25rem 0;
-    }
-    
-    .layer-details strong {
-        color: #2c3e50;
-    }
-    
-    /* 状态消息 */
-    .status-message {
-        background: white;
-        border-radius: 16px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        margin-bottom: 2rem;
-    }
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.layer-details p {
+    margin: 0.25rem 0;
+}
+
+.layer-details strong {
+    color: #2c3e50;
+}
+
+/* 结果文件展示 */
+.layer-results {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.results-header {
+    margin-bottom: 15px;
+}
+
+.results-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    color: #3a3f51;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.results-header h4::before {
+    content: "📂";
+    font-size: 1.2rem;
+}
+
+.results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.result-file-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: 1px solid #e0e0e0;
+}
+
+.result-file-item:hover {
+    background-color: #e9ecef;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.file-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff;
+    color: #667eea;
+    font-size: 1.2rem;
+    border: 1px solid #e0e0e0;
+}
+
+.file-info {
+    flex: 1;
+}
+
+.file-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #3a3f51;
+    margin-bottom: 4px;
+}
+
+.file-size {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-primary {
+    background-color: #667eea;
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    background-color: #5a52e6;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background-color: #f8f9fa;
+    color: #3a3f51;
+    border: 1px solid #dee2e6;
+}
+
+.btn-secondary:hover {
+    background-color: #e9ecef;
+    transform: translateY(-1px);
+}
+
+.no-results {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px dashed #e0e0e0;
+}
+
+/* 状态消息 */
+.status-message {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    margin-bottom: 2rem;
+}
     
     .status-message.success {
         border-left: 4px solid #00d4aa;
@@ -509,12 +636,22 @@
                 <div class="layer-progress-text progress-text">0%</div>
             </div>
             <div class="layer-details">
-                <p><strong>预处理</strong></p>
-                <p>文档解析与结构提取</p>
-                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                    <span class="file-type">文件类型: <strong>--</strong></span>
-                </div>
+            <p><strong>预处理</strong></p>
+            <p>文档解析与结构提取</p>
+            <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                <span class="file-type">文件类型: <strong>--</strong></span>
             </div>
+        </div>
+        <!-- 结果文件展示区域 -->
+        <div class="layer-results">
+            <div class="results-header">
+                <h4>结果文件</h4>
+            </div>
+            <div class="results-list" id="results-layer1">
+                <!-- 结果文件将通过JavaScript动态添加 -->
+                <div class="no-results">暂无结果文件</div>
+            </div>
+        </div>
         </div>
         
         <!-- Layer 2 -->
@@ -535,12 +672,22 @@
                 <div class="layer-progress-text progress-text">0%</div>
             </div>
             <div class="layer-details">
-                <p><strong>语义分析</strong></p>
-                <p>AI驱动的内容分类</p>
-                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                    <span class="chunk-count">分块数量: <strong>--</strong></span>
-                </div>
+            <p><strong>语义分析</strong></p>
+            <p>AI驱动的内容分类</p>
+            <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                <span class="chunk-count">分块数量: <strong>--</strong></span>
             </div>
+        </div>
+        <!-- 结果文件展示区域 -->
+        <div class="layer-results">
+            <div class="results-header">
+                <h4>结果文件</h4>
+            </div>
+            <div class="results-list" id="results-layer2">
+                <!-- 结果文件将通过JavaScript动态添加 -->
+                <div class="no-results">暂无结果文件</div>
+            </div>
+        </div>
         </div>
         
         <!-- Layer 3 -->
@@ -561,12 +708,22 @@
                 <div class="layer-progress-text progress-text">0%</div>
             </div>
             <div class="layer-details">
-                <p><strong>DITA转换</strong></p>
-                <p>生成标准DITA XML</p>
-                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                    <span class="conversion-rate">成功率: <strong>--</strong></span>
-                </div>
+            <p><strong>DITA转换</strong></p>
+            <p>生成标准DITA XML</p>
+            <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                <span class="conversion-rate">成功率: <strong>--</strong></span>
             </div>
+        </div>
+        <!-- 结果文件展示区域 -->
+        <div class="layer-results">
+            <div class="results-header">
+                <h4>结果文件</h4>
+            </div>
+            <div class="results-list" id="results-layer3">
+                <!-- 结果文件将通过JavaScript动态添加 -->
+                <div class="no-results">暂无结果文件</div>
+            </div>
+        </div>
         </div>
         
         <!-- Layer 4 -->
@@ -587,12 +744,22 @@
                 <div class="layer-progress-text progress-text">0%</div>
             </div>
             <div class="layer-details">
-                <p><strong>质量保证</strong></p>
-                <p>验证与优化</p>
-                <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                    <span class="quality-score">质量评分: <strong>--</strong></span>
-                </div>
+            <p><strong>质量保证</strong></p>
+            <p>验证与优化</p>
+            <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
+                <span class="quality-score">质量评分: <strong>--</strong></span>
             </div>
+        </div>
+        <!-- 结果文件展示区域 -->
+        <div class="layer-results">
+            <div class="results-header">
+                <h4>结果文件</h4>
+            </div>
+            <div class="results-list" id="results-layer4">
+                <!-- 结果文件将通过JavaScript动态添加 -->
+                <div class="no-results">暂无结果文件</div>
+            </div>
+        </div>
         </div>
     </div>
     
