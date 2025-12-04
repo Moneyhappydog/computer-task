@@ -3,12 +3,13 @@ Word 文档处理器
 负责将 .docx 文档转换为结构化 Markdown
 """
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import logging
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.shared import Pt
 import re
+from .image_extractor import ImageExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,37 @@ class WordProcessor:
                 'headings': {}
             }
             
+            # 提取图片
+            image_mapping = {}
+            image_dir = None
+            doc_name = file_path.stem
+            
+            if len(doc.inline_shapes) > 0:
+                try:
+                    # 准备图片字典，统一使用 {page_num: [image_obj]} 格式
+                    # Word没有页码概念，我们使用0作为"page_num"
+                    word_images = {0: []}
+                    for idx, shape in enumerate(doc.inline_shapes):
+                        try:
+                            # 从inline_shapes中获取图片二进制数据
+                            image_stream = shape._inline.graphic.graphicData.pic.blipFill.blip.embed
+                            image_part = doc.part.related_parts[image_stream]
+                            word_images[0].append(image_part.blob)
+                        except Exception as e:
+                            logger.warning(f"提取第{idx}个图片失败: {e}")
+                    
+                    if word_images:
+                        extractor = ImageExtractor()
+                        result_dict = extractor.extract_and_save_images(
+                            images=word_images,
+                            doc_name=doc_name
+                        )
+                        image_mapping = result_dict['image_mapping']
+                        image_dir = result_dict['image_dir']
+                        logger.info(f"✓ 提取并保存了 {len(image_mapping)} 张图片到: {image_dir}")
+                except Exception as e:
+                    logger.warning(f"图片提取失败: {e}")
+            
             # 处理段落
             for para in doc.paragraphs:
                 md_text = self._process_paragraph(para, metadata)
@@ -63,16 +95,53 @@ class WordProcessor:
             
             # 统计图片
             metadata['images'] = len(doc.inline_shapes)
+            metadata['image_dir'] = str(image_dir) if image_dir else None
+            metadata['image_count'] = len(image_mapping)
             
             markdown_content = '\n\n'.join(markdown_lines)
+            
+            # 如果有图片，添加图片引用到Markdown
+            if image_mapping:
+                image_refs = []
+                for img_name, img_path in image_mapping.items():
+                    # img_path 已经是 ../images/xxx.png 格式
+                    image_refs.append(f"![{img_name}]({img_path})")
+                
+                if image_refs:
+                    markdown_content += "\n\n## 文档图片\n\n" + "\n\n".join(image_refs)
+            
+            # 保存输出到 data/output/{doc_name}/layer1/
+            from utils.config import Config
+            import re
+            output_dir = Path(Config.OUTPUT_DIR) / doc_name / "layer1"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 再次确保图片路径正确（统一修正）
+            if image_mapping:
+                for img_name in image_mapping.keys():
+                    pattern = f"!\\[([^\\]]*)\\]\\({img_name}\\.png\\)"
+                    replacement = f"![\\1](../images/{img_name}.png)"
+                    markdown_content = re.sub(pattern, replacement, markdown_content)
+            
+            # 保存Markdown文件
+            markdown_file = output_dir / f"{doc_name}.md"
+            markdown_file.write_text(markdown_content, encoding='utf-8')
+            logger.info(f"✓ 已保存Markdown到: {markdown_file}")
             
             logger.info(f"✅ Word处理完成: {metadata['paragraphs']}段落, "
                        f"{metadata['tables']}表格, {metadata['images']}图片")
             
             return {
                 'markdown': markdown_content,
-                'metadata': metadata,
-                'success': True
+                'metadata': {
+                    **metadata,
+                    'image_dir': str(image_dir) if image_dir else None,
+                    'image_count': len(image_mapping),
+                    'output_file': str(markdown_file)
+                },
+                'success': True,
+                'image_mapping': image_mapping,
+                'image_dir': str(image_dir) if image_dir else None
             }
             
         except Exception as e:

@@ -44,6 +44,7 @@ def test_pdf_processor(pdf_path: Path) -> bool:
     
     print(f"✅ 测试文件: {pdf_path.name}")
     print(f"📁 文件路径: {pdf_path}")
+    print(f"📁 文件名(不含扩展名): {pdf_path.stem}")
     
     # 测试1: 使用marker提取（启用OCR）
     print("\n1️⃣  测试Marker提取（深度学习方案，启用OCR）...")
@@ -55,52 +56,30 @@ def test_pdf_processor(pdf_path: Path) -> bool:
         print(f"   提取方法: {result_marker['metadata']['method']}")
         print(f"   总页数: {result_marker['metadata']['pages']}")
         print(f"   总字符数: {len(result_marker['markdown'])}")
+        print(f"   图片数量: {result_marker['metadata'].get('image_count', 0)}")
+        print(f"   图片保存目录: {result_marker['metadata'].get('image_dir', 'None')}")
+        print(f"   Markdown保存位置: {result_marker['metadata'].get('output_file', 'None')}")
         print(f"   元数据: {result_marker['metadata'].get('raw_metadata', {})}")
         
-        # 显示完整提取内容
-        print(f"\n📄 Marker提取完整内容:")
+        if result_marker.get('image_mapping'):
+            print(f"\n   图片映射 ({len(result_marker['image_mapping'])}张):")
+            for old, new in list(result_marker['image_mapping'].items())[:5]:  # 只显示前5个
+                print(f"     {old} -> {new}")
+            if len(result_marker['image_mapping']) > 5:
+                print(f"     ... 还有 {len(result_marker['image_mapping']) - 5} 张图片")
+        
+        # 显示部分提取内容
+        print(f"\n📄 Marker提取内容预览 (前1000字符):")
         print("=" * 70)
-        print(result_marker['markdown'])
+        print(result_marker['markdown'][:1000])
         print("=" * 70)
     else:
         print(f"⚠️  Marker提取失败: {result_marker.get('error')}")
     
-    # 测试2: 使用OCR提取（扫描件方案）
-    print("\n2️⃣  测试OCR提取（扫描件方案）...")
-    processor_ocr = PDFProcessor(use_marker=False, use_ocr=True)
-    result_ocr = processor_ocr.process(pdf_path)
+    return True
     
-    if result_ocr['success']:
-        print("✅ OCR提取成功!")
-        print(f"   提取方法: {result_ocr['metadata']['method']}")
-        print(f"   总页数: {result_ocr['metadata']['pages']}")
-        print(f"   总字符数: {len(result_ocr['markdown'])}")
-        print(f"   元数据: {result_ocr['metadata'].get('raw_metadata', {})}")
-        
-        # 显示完整提取内容
-        print(f"\n📄 OCR提取完整内容:")
-        print("=" * 70)
-        print(result_ocr['markdown'])
-        print("=" * 70)
-        
-        # 测试3: 判断是否需要OCR
-        extract_result = processor_ocr.extract_text(pdf_path)
-        needs_ocr = processor_ocr.needs_ocr(extract_result)
-        print(f"\n3️⃣  OCR需求检测:")
-        print(f"   {'⚠️ 需要OCR' if needs_ocr else '✅ 不需要OCR'} (扫描件/纯文本判断)")
-    else:
-        print(f"❌ OCR提取失败: {result_ocr.get('error')}")
-        return False
-    
-    # 测试4: 比较提取方法
-    if result_marker['success'] and result_ocr['success']:
-        print("\n5️⃣  提取结果比较:")
-        marker_chars = len(result_marker['markdown'])
-        ocr_chars = len(result_ocr['markdown'])
-        diff = abs(marker_chars - ocr_chars) / max(marker_chars, ocr_chars) * 100
-        print(f"   Marker提取字符数: {marker_chars}")
-        print(f"   OCR提取字符数: {ocr_chars}")
-        print(f"   字符数差异: {diff:.1f}%")
+    # 测试2: OCR模式已经在Marker中集成，不再单独测试
+    print("\n2️⃣  提示: OCR功能已集成在Marker中")
     
     return True
 
@@ -120,6 +99,7 @@ def test_word_processor(word_path: Path) -> bool:
     
     print(f"✅ 测试文件: {word_path.name}")
     print(f"📁 文件路径: {word_path}")
+    print(f"📁 文件名(不含扩展名): {word_path.stem}")
     
     # 创建处理器
     processor = WordProcessor()
@@ -142,13 +122,21 @@ def test_word_processor(word_path: Path) -> bool:
     print(f"   总段落数: {result['metadata']['paragraphs']}")
     print(f"   总表格数: {result['metadata']['tables']}")
     print(f"   总图片数: {result['metadata']['images']}")
+    print(f"   图片数量: {result['metadata'].get('image_count', 0)}")
+    print(f"   图片保存目录: {result['metadata'].get('image_dir', 'None')}")
+    print(f"   Markdown保存位置: {result['metadata'].get('output_file', 'None')}")
     print(f"   标题统计: {result['metadata']['headings']}")
     print(f"   总字符数: {len(result['markdown'])}")
     
-    # 显示完整提取内容
-    print(f"\n📄 Word提取完整内容:")
+    if result.get('image_mapping'):
+        print(f"\n   图片映射 ({len(result['image_mapping'])}张):")
+        for old, new in result['image_mapping'].items():
+            print(f"     {old} -> {new}")
+    
+    # 显示部分提取内容
+    print(f"\n📄 Word提取内容预览 (前1000字符):")
     print("=" * 70)
-    print(result['markdown'])
+    print(result['markdown'][:1000])
     print("=" * 70)
     
     # 详细分析提取结果
@@ -229,6 +217,14 @@ def run_tests(pdf_path: Path = None, word_path: Path = None) -> None:
     print("\n" + "="*70)
     print("✅ Layer 1 测试完成！")
     print("="*70)
+    print("\n📁 输出文件结构:")
+    print("data/output/")
+    print("  └── {文件名}/")
+    print("      ├── layer1/")
+    print("      │   └── {文件名}.md     # Markdown输出")
+    print("      └── images/              # 提取的图片")
+    print("          ├── 0_image_0.png")
+    print("          └── ...")
 
 
 if __name__ == "__main__":

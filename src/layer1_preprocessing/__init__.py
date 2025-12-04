@@ -6,10 +6,12 @@ from .pdf_processor import PDFProcessor
 from .word_processor import WordProcessor
 from .ocr_processor import OCRProcessor
 from .file_router import FileRouter
+from .image_extractor import ImageExtractor
 
 __all__ = [
     'PDFProcessor',
     'WordProcessor',
     'OCRProcessor',
-    'FileRouter'
+    'FileRouter',
+    'ImageExtractor'
 ]

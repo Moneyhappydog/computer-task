@@ -14,6 +14,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.logger import setup_logger
 from utils.config import Config
 from .ocr_processor import OCRProcessor
+from .image_extractor import ImageExtractor
 
 logger = setup_logger(__name__)
 
@@ -75,7 +76,9 @@ class PDFProcessor:
                     ...
                 ],
                 "metadata": {"title": "...", "author": "...", ...},
-                "method": "marker|ocr"
+                "method": "marker|ocr",
+                "image_mapping": {"old_path": "new_path", ...},
+                "image_dir": "保存图片的目录"
             }
         """
         logger.info(f"开始处理PDF: {pdf_path.name}")
@@ -117,7 +120,7 @@ class PDFProcessor:
         
         return best_result
     
-    def _extract_with_marker(self, pdf_path: Path) -> Dict:
+    def _extract_with_marker(self, pdf_path: Path, session_id: Optional[str] = None) -> Dict:
         """使用Marker进行智能PDF解析（深度学习方案）- 内存优化版"""
         logger.info("使用Marker进行智能PDF解析...")
         
@@ -162,6 +165,38 @@ class PDFProcessor:
                 images = {}
                 metadata = {}
             
+            # 提取并保存图片
+            image_mapping = {}
+            image_dir = None
+            doc_name = pdf_path.stem
+            
+            if images:
+                try:
+                    # 调试信息：查看images的格式
+                    logger.info(f"Images字典类型: {type(images)}")
+                    if isinstance(images, dict) and images:
+                        sample_key = list(images.keys())[0]
+                        sample_value = images[sample_key]
+                        logger.info(f"示例键: {sample_key} (类型: {type(sample_key)})")
+                        logger.info(f"示例值类型: {type(sample_value)}")
+                        if isinstance(sample_value, list) and sample_value:
+                            logger.info(f"列表第一个元素类型: {type(sample_value[0])}")
+                    
+                    extractor = ImageExtractor()
+                    result_dict = extractor.extract_and_save_images(
+                        images=images,
+                        doc_name=doc_name
+                    )
+                    image_mapping = result_dict['image_mapping']
+                    image_dir = result_dict['image_dir']
+                    
+                    # 修正Markdown中的图片路径
+                    full_text = extractor.fix_markdown_image_paths(full_text, image_mapping)
+                    
+                    logger.success(f"✓ 提取并保存了 {len(image_mapping)} 张图片到: {image_dir}")
+                except Exception as e:
+                    logger.warning(f"图片提取失败: {e}")
+            
             # Marker返回的是markdown格式，需要按页分割
             pages = []
             page_texts = full_text.split("\n---\n")  # Marker用---分隔页面
@@ -180,7 +215,9 @@ class PDFProcessor:
                 "text": full_text,
                 "pages": pages,
                 "metadata": metadata,
-                "method": "marker"
+                "method": "marker",
+                "image_mapping": image_mapping,
+                "image_dir": str(image_dir) if image_dir else None
             }
             
         except Exception as e:
@@ -245,19 +282,50 @@ class PDFProcessor:
             # 提取文本
             result = self.extract_text(file_path)
             
+            # 再次确保图片路径正确（防止遗漏）
+            markdown_text = result.get('text', '')
+            image_mapping = result.get('image_mapping', {})
+            
+            if image_mapping:
+                # 修正所有图片引用为相对路径
+                for img_name in image_mapping.keys():
+                    # 匹配 ![xxx](0_image_0.png) 格式
+                    pattern = f"!\\[([^\\]]*)\\]\\({img_name}\\.png\\)"
+                    replacement = f"![\\1](../images/{img_name}.png)"
+                    markdown_text = re.sub(pattern, replacement, markdown_text)
+                
+                logger.info(f"✓ 已修正 {len(image_mapping)} 个图片引用为相对路径")
+            
+            # 保存输出到 data/output/{doc_name}/layer1/
+            from utils.config import Config
+            import re
+            doc_name = file_path.stem
+            output_dir = Path(Config.OUTPUT_DIR) / doc_name / "layer1"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 保存Markdown文件
+            markdown_file = output_dir / f"{doc_name}.md"
+            markdown_file.write_text(markdown_text, encoding='utf-8')
+            logger.info(f"✓ 已保存Markdown到: {markdown_file}")
+            
             # 转换为统一格式
             return {
-                'markdown': result.get('text', ''),
+                'markdown': markdown_text,  # 返回修正后的文本
                 'metadata': {
                     'file_name': file_path.name,
                     'file_type': 'pdf',
                     'method': result.get('method', 'unknown'),
                     'pages': len(result.get('pages', [])),
-                    'raw_metadata': result.get('metadata', {})
+                    'raw_metadata': result.get('metadata', {}),
+                    'image_dir': result.get('image_dir'),
+                    'image_count': len(result.get('image_mapping', {})),
+                    'output_file': str(markdown_file)
                 },
                 'success': True,
                 'pages': result.get('pages', []),
-                'raw_result': result
+                'raw_result': result,
+                'image_mapping': result.get('image_mapping', {}),
+                'image_dir': result.get('image_dir')
             }
             
         except Exception as e:
