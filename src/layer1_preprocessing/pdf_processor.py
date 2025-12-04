@@ -172,16 +172,6 @@ class PDFProcessor:
             
             if images:
                 try:
-                    # 调试信息：查看images的格式
-                    logger.info(f"Images字典类型: {type(images)}")
-                    if isinstance(images, dict) and images:
-                        sample_key = list(images.keys())[0]
-                        sample_value = images[sample_key]
-                        logger.info(f"示例键: {sample_key} (类型: {type(sample_key)})")
-                        logger.info(f"示例值类型: {type(sample_value)}")
-                        if isinstance(sample_value, list) and sample_value:
-                            logger.info(f"列表第一个元素类型: {type(sample_value[0])}")
-                    
                     extractor = ImageExtractor()
                     result_dict = extractor.extract_and_save_images(
                         images=images,
@@ -279,22 +269,9 @@ class PDFProcessor:
             包含markdown内容和元数据的字典
         """
         try:
-            # 提取文本
+            # 提取文本（extract_text 内部已经调用了 fix_markdown_image_paths）
             result = self.extract_text(file_path)
-            
-            # 再次确保图片路径正确（防止遗漏）
             markdown_text = result.get('text', '')
-            image_mapping = result.get('image_mapping', {})
-            
-            if image_mapping:
-                # 修正所有图片引用为相对路径
-                for img_name in image_mapping.keys():
-                    # 匹配 ![xxx](0_image_0.png) 格式
-                    pattern = f"!\\[([^\\]]*)\\]\\({img_name}\\.png\\)"
-                    replacement = f"![\\1](../images/{img_name}.png)"
-                    markdown_text = re.sub(pattern, replacement, markdown_text)
-                
-                logger.info(f"✓ 已修正 {len(image_mapping)} 个图片引用为相对路径")
             
             # 保存输出到 data/output/{doc_name}/layer1/
             from utils.config import Config

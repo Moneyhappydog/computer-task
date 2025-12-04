@@ -66,38 +66,79 @@ class ImageExtractor:
         logger.info("开始保存图片...")
         
         for page_num, page_images in images.items():
-            # 将page_num转为int（如果是字符串）
-            try:
-                page_idx = int(page_num)
-            except (ValueError, TypeError):
-                page_idx = page_num
+            # 判断 page_num 是否已经是文件名（如 Marker 返回的格式）
+            # Marker 格式: {"0_image_0.png": PIL.Image, ...}
+            # 标准格式: {0: [PIL.Image, ...], ...}
             
-            # 确保是list
-            if not isinstance(page_images, list):
-                page_images = [page_images]
+            is_filename = isinstance(page_num, str) and page_num.endswith('.png')
             
-            for img_idx, image_obj in enumerate(page_images):
-                total_count += 1
+            if is_filename:
+                # Marker 格式：key 已经是完整文件名
+                # 提取不含扩展名的部分作为 img_name
+                img_name = page_num.rsplit('.', 1)[0]  # "0_image_0.png" -> "0_image_0"
+                page_images_list = [page_images] if not isinstance(page_images, list) else page_images
                 
-                # 生成文件名
-                img_name = f"{page_idx}_image_{img_idx}"
-                img_filename = f"{img_name}.png"
-                img_path = image_dir / img_filename
-                
-                # 保存图片
+                for img_idx, image_obj in enumerate(page_images_list):
+                    total_count += 1
+                    
+                    # 对于多个图片的情况（虽然 Marker 通常一个 key 对应一个图片）
+                    if img_idx > 0:
+                        current_img_name = f"{img_name}_{img_idx}"
+                    else:
+                        current_img_name = img_name
+                    
+                    img_filename = f"{current_img_name}.png"
+                    img_path = image_dir / img_filename
+                    
+                    # 保存图片
+                    try:
+                        self._save_image_object(image_obj, img_path)
+                        
+                        # 记录相对路径（相对于 Markdown 文件所在的 layer1 目录）
+                        relative_path = f"../images/{img_filename}"
+                        image_mapping[current_img_name] = relative_path
+                        
+                        saved_count += 1
+                        logger.debug(f"已保存图片: {img_filename}")
+                        
+                    except Exception as e:
+                        failed_count += 1
+                        logger.warning(f"保存图片失败 {img_filename}: {e}")
+            
+            else:
+                # 标准格式：key 是页码
                 try:
-                    self._save_image_object(image_obj, img_path)
+                    page_idx = int(page_num)
+                except (ValueError, TypeError):
+                    page_idx = 0
+                    logger.warning(f"无法解析页码: {page_num}，使用默认值 0")
+                
+                # 确保是list
+                if not isinstance(page_images, list):
+                    page_images = [page_images]
+                
+                for img_idx, image_obj in enumerate(page_images):
+                    total_count += 1
                     
-                    # 记录相对路径（相对于 Markdown 文件所在的 layer1 目录）
-                    relative_path = f"../images/{img_filename}"
-                    image_mapping[img_name] = relative_path
+                    # 生成文件名
+                    img_name = f"{page_idx}_image_{img_idx}"
+                    img_filename = f"{img_name}.png"
+                    img_path = image_dir / img_filename
                     
-                    saved_count += 1
-                    logger.debug(f"已保存图片: {img_filename}")
-                    
-                except Exception as e:
-                    failed_count += 1
-                    logger.warning(f"保存图片失败 {img_filename}: {e}")
+                    # 保存图片
+                    try:
+                        self._save_image_object(image_obj, img_path)
+                        
+                        # 记录相对路径（相对于 Markdown 文件所在的 layer1 目录）
+                        relative_path = f"../images/{img_filename}"
+                        image_mapping[img_name] = relative_path
+                        
+                        saved_count += 1
+                        logger.debug(f"已保存图片: {img_filename}")
+                        
+                    except Exception as e:
+                        failed_count += 1
+                        logger.warning(f"保存图片失败 {img_filename}: {e}")
         
         result = {
             'image_mapping': image_mapping,
@@ -149,16 +190,14 @@ class ImageExtractor:
     def fix_markdown_image_paths(
         self,
         markdown_text: str,
-        image_mapping: Dict[str, str],
-        base_path: str = ""
+        image_mapping: Dict[str, str]
     ) -> str:
         """
         修正 Markdown 中的图片路径
         
         Args:
             markdown_text: 原始 Markdown 文本
-            image_mapping: 图片路径映射 {'0_image_0': 'session/images/0_image_0.png'}
-            base_path: 基础路径前缀（可选）
+            image_mapping: 图片路径映射 {'0_image_0': '../images/0_image_0.png'}
         
         Returns:
             修正后的 Markdown 文本
@@ -171,20 +210,20 @@ class ImageExtractor:
         modified_text = markdown_text
         fixed_count = 0
         
-        for img_name, new_path in image_mapping.items():
-            # 添加基础路径（如果需要）
-            full_path = f"{base_path}/{new_path}" if base_path else new_path
+        for img_name, relative_path in image_mapping.items():
+            # img_name 格式: "0_image_0" (不含扩展名)
+            # relative_path 格式: "../images/0_image_0.png" (已包含扩展名)
             
             # 匹配多种可能的图片引用格式
             patterns = [
                 # Marker 格式: ![](0_image_0.png) 或 ![xxx](0_image_0.png)
-                (f"!\\[.*?\\]\\({re.escape(img_name)}\\.png\\)", f"![Figure]({full_path})"),
+                (f"!\\[([^\\]]*)\\]\\({re.escape(img_name)}\\.png\\)", f"![\\1]({relative_path})"),
                 
                 # 可能的其他格式: ![](0_image_0) 不带扩展名
-                (f"!\\[.*?\\]\\({re.escape(img_name)}\\)", f"![Figure]({full_path})"),
+                (f"!\\[([^\\]]*)\\]\\({re.escape(img_name)}\\)", f"![\\1]({relative_path})"),
                 
                 # HTML 格式: <img src="0_image_0.png">
-                (f'<img\\s+src="{re.escape(img_name)}\\.png".*?>', f'<img src="{full_path}">'),
+                (f'<img\\s+src="{re.escape(img_name)}\\.png".*?>', f'<img src="{relative_path}">'),
             ]
             
             for pattern, replacement in patterns:
@@ -192,7 +231,7 @@ class ImageExtractor:
                 if new_text != modified_text:
                     fixed_count += 1
                     modified_text = new_text
-                    logger.debug(f"已修正图片引用: {img_name}")
+                    logger.debug(f"已修正图片引用: {img_name} -> {relative_path}")
         
         logger.info(f"✅ 修正完成: {fixed_count} 个图片引用")
         
