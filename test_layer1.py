@@ -2,6 +2,7 @@
 测试Layer 1 - PDF和Word文档预处理
 详细测试每一层功能，支持用户自定义输入文件
 """
+import json
 from pathlib import Path
 import argparse
 import sys
@@ -60,6 +61,15 @@ def test_pdf_processor(pdf_path: Path) -> bool:
         print(f"   图片保存目录: {result_marker['metadata'].get('image_dir', 'None')}")
         print(f"   Markdown保存位置: {result_marker['metadata'].get('output_file', 'None')}")
         print(f"   元数据: {result_marker['metadata'].get('raw_metadata', {})}")
+        
+        # 保存 layer1_result.json（与 test_integration.py 保持一致）
+        output_file_path = Path(result_marker['metadata'].get('output_file'))
+        layer1_output_dir = output_file_path.parent
+        layer1_json_path = layer1_output_dir / "layer1_result.json"
+        
+        with open(layer1_json_path, 'w', encoding='utf-8') as f:
+            json.dump(result_marker, f, ensure_ascii=False, indent=2)
+        print(f"   JSON结果保存位置: {layer1_json_path}")
         
         if result_marker.get('image_mapping'):
             print(f"\n   图片映射 ({len(result_marker['image_mapping'])}张):")
@@ -127,6 +137,15 @@ def test_word_processor(word_path: Path) -> bool:
     print(f"   Markdown保存位置: {result['metadata'].get('output_file', 'None')}")
     print(f"   标题统计: {result['metadata']['headings']}")
     print(f"   总字符数: {len(result['markdown'])}")
+    
+    # 保存 layer1_result.json（与 test_integration.py 保持一致）
+    output_file_path = Path(result['metadata'].get('output_file'))
+    layer1_output_dir = output_file_path.parent
+    layer1_json_path = layer1_output_dir / "layer1_result.json"
+    
+    with open(layer1_json_path, 'w', encoding='utf-8') as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(f"   JSON结果保存位置: {layer1_json_path}")
     
     if result.get('image_mapping'):
         print(f"\n   图片映射 ({len(result['image_mapping'])}张):")
