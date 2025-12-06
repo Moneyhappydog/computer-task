@@ -12,6 +12,8 @@ python-docx==1.1.0          # DOCX文件读取
 PyPDF2==3.0.1               # PDF基础操作
 pdf2image==1.17.0           # PDF转图像（需要poppler）
 pytesseract==0.3.10         # Tesseract OCR Python包装器
+PyMuPDF>=1.23.0             # PDF高级处理（fitz）- 用于公式提取
+pix2tex>=0.1.2              # LaTeX OCR - 公式图片转LaTeX
 
 # ===== Layer 2: 深度学习与NLP =====
 # ⚠️ 关键约束：固定 transformers 版本以兼容 marker-pdf 0.2.17
