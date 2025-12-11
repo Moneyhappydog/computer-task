@@ -362,12 +362,15 @@ class ContentStructurer:
     
     def _extract_concept_by_rules(self, content: str, title: str) -> Dict:
         """使用规则提取Concept结构"""
+        # 先提取并标记表格，避免被分段打散
+        content = self._mark_tables(content)
+        
         # 转换Markdown图片为DITA格式
         content = self._convert_markdown_images_to_dita(content)
         
-        # 使用__FIG_END__标记来辅助分段
-        # 将__FIG_END__作为段落分隔的信号
+        # 使用__FIG_END__和__TABLE_END__标记来辅助分段
         content = content.replace('__FIG_END__', '\n\n')
+        content = content.replace('__TABLE_END__', '\n\n')
         
         # 简单分段
         paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
@@ -429,6 +432,230 @@ class ContentStructurer:
                     }
         
         return None
+    
+    def _mark_tables(self, content: str) -> str:
+        """
+        检测Markdown表格并转换为DITA table格式
+        使用占位符标记，避免表格被分段打散
+        
+        Args:
+            content: 包含Markdown表格的内容
+            
+        Returns:
+            转换后的内容
+        """
+        lines = content.split('\n')
+        result_lines = []
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # 检测表格分隔线 |---|---| 或 |----|----| 
+            if re.match(r'^\s*\|[\s\-:]+\|\s*$', line.strip()) or re.match(r'^\s*\|[-:\s|]+\|\s*$', line.strip()):
+                # 向上查找表头行（可能有多行）
+                header_lines = []
+                j = i - 1
+                while j >= 0 and '|' in lines[j]:
+                    header_lines.insert(0, lines[j])
+                    j -= 1
+                
+                # 检测表格标题（可能在表头上面1-2行）
+                table_title = None
+                title_idx = j  # j现在指向表头之前的行
+                if title_idx >= 0:
+                    potential_title = lines[title_idx].strip()
+                    # 检测是否是"Table X. ..."格式
+                    if re.match(r'^Table\s+\d+\.', potential_title, re.IGNORECASE):
+                        table_title = potential_title
+                
+                # 提取数据行
+                data_rows_raw = []
+                k = i + 1
+                while k < len(lines):
+                    data_line = lines[k].strip()
+                    if not data_line or '|' not in data_line:
+                        break
+                    data_rows_raw.append(data_line)
+                    k += 1
+                
+                # 如果找到了表格内容，生成DITA table
+                if header_lines or data_rows_raw:
+                    # 解析表头
+                    headers = []
+                    for header_line in header_lines:
+                        cells = [cell.strip() for cell in header_line.split('|')]
+                        # 移除首尾空字符串
+                        cells = [c for c in cells if c]
+                        if cells:
+                            headers.append(cells)
+                    
+                    # 解析数据行
+                    data_rows = []
+                    for data_line in data_rows_raw:
+                        cells = [cell.strip() for cell in data_line.split('|')]
+                        cells = [c for c in cells if c or True]  # 保留空单元格
+                        # 移除首尾空字符串（来自行首尾的|）
+                        if cells and cells[0] == '':
+                            cells = cells[1:]
+                        if cells and cells[-1] == '':
+                            cells = cells[:-1]
+                        if cells:
+                            data_rows.append(cells)
+                    
+                    # 生成DITA table
+                    dita_table = self._generate_dita_table_from_lines(headers, data_rows, table_title)
+                    
+                    # 清除已添加到result_lines中的表头行
+                    for _ in header_lines:
+                        if result_lines and '|' in result_lines[-1]:
+                            result_lines.pop()
+                    
+                    # 如果有表格标题，也从result_lines中移除
+                    if table_title and result_lines:
+                        if table_title in result_lines[-1]:
+                            result_lines.pop()
+                    
+                    result_lines.append(dita_table)
+                    result_lines.append('\n__TABLE_END__\n')  # 添加分段标记
+                    
+                    # 跳到表格结束位置
+                    i = k
+                    continue
+            
+            result_lines.append(line)
+            i += 1
+        
+        return '\n'.join(result_lines)
+    
+    def _generate_dita_table_from_lines(self, header_lines: list, data_rows: list, title: str = None) -> str:
+        """
+        从解析的表格行生成DITA table XML（智能版本）
+        
+        自动检测：
+        1. 实际列数（从所有行的最大单元格数）
+        2. 混合表头（部分单元格包含空格分隔的子列）
+        3. 跨列合并（根据单元格位置和空单元格自动推断）
+        
+        Args:
+            header_lines: 表头行列表（可能多行）
+            data_rows: 数据行列表
+            title: 表格标题（可选）
+            
+        Returns:
+            DITA table XML字符串
+        """
+        # === 第一步：智能解析所有行，检测真实列结构 ===
+        all_rows = header_lines + data_rows
+        if not all_rows:
+            return ''
+        
+        # 分析每行的单元格，检测是否有子列（空格分隔的值）
+        expanded_rows = []
+        max_cols = 0
+        
+        for row in all_rows:
+            # 检查每个单元格是否包含多个空格分隔的值
+            expanded_row = []
+            for cell in row:
+                cell_stripped = cell.strip()
+                if not cell_stripped:
+                    expanded_row.append('')
+                    continue
+                
+                # 检测单元格是否包含多列数据
+                # 模式1: "1-100 101-150" (空格分隔的多个数值/标识)
+                # 模式2: "PS KD AD" (多个短标识符)
+                parts = cell_stripped.split()
+                
+                # 如果分割后有多个部分且每个部分都很短，可能是多列
+                if len(parts) > 1 and all(len(p) < 15 for p in parts):
+                    # 检查是否是数值类型或简短标识符
+                    if all(bool(re.match(r'^[\d\.\-XxOo✓✗]+$', p)) or len(p) <= 6 for p in parts):
+                        expanded_row.extend(parts)
+                        continue
+                
+                expanded_row.append(cell_stripped)
+            
+            expanded_rows.append(expanded_row)
+            max_cols = max(max_cols, len(expanded_row))
+        
+        if max_cols == 0:
+            return ''
+        
+        # 统一所有行的列数（补齐空单元格）
+        for row in expanded_rows:
+            while len(row) < max_cols:
+                row.append('')
+        
+        # 分离表头和数据
+        num_headers = len(header_lines)
+        header_rows_expanded = expanded_rows[:num_headers]
+        data_rows_expanded = expanded_rows[num_headers:]
+        
+        # === 第二步：生成DITA XML ===
+        table_xml = ['<table>']
+        
+        if title:
+            table_xml.append(f'  <title>{title}</title>')
+        
+        table_xml.append(f'  <tgroup cols="{max_cols}">')
+        
+        # colspec定义
+        for col_idx in range(max_cols):
+            table_xml.append(f'    <colspec colname="col{col_idx+1}"/>')
+        
+        # 表头：智能检测跨列合并
+        if header_rows_expanded:
+            table_xml.append('    <thead>')
+            
+            for header_row in header_rows_expanded:
+                table_xml.append('      <row>')
+                
+                # 检测连续空单元格模式，用于跨列合并
+                col_idx = 0
+                while col_idx < max_cols:
+                    cell = header_row[col_idx]
+                    
+                    if cell:
+                        # 非空单元格：检查后续是否有空单元格（可能是跨列）
+                        span = 1
+                        while col_idx + span < max_cols and not header_row[col_idx + span]:
+                            span += 1
+                        
+                        if span > 1:
+                            namest = f"col{col_idx+1}"
+                            nameend = f"col{col_idx+span}"
+                            table_xml.append(f'        <entry namest="{namest}" nameend="{nameend}">{cell}</entry>')
+                        else:
+                            table_xml.append(f'        <entry>{cell}</entry>')
+                        
+                        col_idx += span
+                    else:
+                        # 空单元格
+                        table_xml.append(f'        <entry/>')
+                        col_idx += 1
+                
+                table_xml.append('      </row>')
+            
+            table_xml.append('    </thead>')
+        
+        # 表体
+        if data_rows_expanded:
+            table_xml.append('    <tbody>')
+            
+            for row in data_rows_expanded:
+                table_xml.append('      <row>')
+                for cell in row:
+                    table_xml.append(f'        <entry>{cell if cell else ""}</entry>')
+                table_xml.append('      </row>')
+            
+            table_xml.append('    </tbody>')
+        
+        table_xml.append('  </tgroup>')
+        table_xml.append('</table>')
+        
+        return '\n'.join(table_xml)
     
     def _convert_markdown_images_to_dita(self, content: str) -> str:
         """

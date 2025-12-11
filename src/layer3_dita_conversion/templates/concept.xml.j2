@@ -24,7 +24,7 @@
       {% if section.title %}
       <title>{{ section.title }}</title>
       {% endif %}
-      {% if '<fig>' in section.content or '<fig ' in section.content %}
+      {% if '<fig>' in section.content or '<fig ' in section.content or '<table>' in section.content %}
       {{ section.content | safe }}
       {% else %}
       <p>{{ section.content }}</p>

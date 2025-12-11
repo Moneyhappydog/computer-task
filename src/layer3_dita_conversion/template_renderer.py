@@ -133,7 +133,15 @@ class TemplateRenderer:
         # 定义允许的DITA标签模式
         # 这些标签不会被转义
         allowed_tags = [
+            r'<table[^>]*>[\s\S]*?</table>',  # table标签（必须先匹配，包含换行）
             r'<fig[^>]*>[\s\S]*?</fig>',  # figure标签（必须先匹配，包含换行）
+            r'<tgroup[^>]*>[\s\S]*?</tgroup>',  # tgroup标签
+            r'<thead>[\s\S]*?</thead>',  # thead标签
+            r'<tbody>[\s\S]*?</tbody>',  # tbody标签
+            r'<row>[\s\S]*?</row>',  # row标签
+            r'<entry[^>]*>.*?</entry>',  # entry标签
+            r'<entry[^>]*/>',  # 自闭合entry标签
+            r'<title>.*?</title>',  # title标签（用于表格标题）
             r'<image\s+[^>]*/>',  # 自闭合image标签
             r'<image\s+[^>]*>.*?</image>',  # 成对的image标签
             r'<b>.*?</b>',  # 粗体
