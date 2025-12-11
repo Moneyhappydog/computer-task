@@ -326,6 +326,9 @@ class ContentStructurer:
     
     def _extract_task_by_rules(self, content: str, title: str) -> Dict:
         """使用规则提取Task结构（不依赖LLM）"""
+        # 转换Markdown图片为DITA格式
+        content = self._convert_markdown_images_to_dita(content)
+        
         steps = []
         
         # 匹配编号列表 (1. xxx, 2. xxx)
@@ -359,6 +362,13 @@ class ContentStructurer:
     
     def _extract_concept_by_rules(self, content: str, title: str) -> Dict:
         """使用规则提取Concept结构"""
+        # 转换Markdown图片为DITA格式
+        content = self._convert_markdown_images_to_dita(content)
+        
+        # 使用__FIG_END__标记来辅助分段
+        # 将__FIG_END__作为段落分隔的信号
+        content = content.replace('__FIG_END__', '\n\n')
+        
         # 简单分段
         paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
         
@@ -379,6 +389,9 @@ class ContentStructurer:
     
     def _extract_reference_by_rules(self, content: str, title: str) -> Dict:
         """使用规则提取Reference结构"""
+        # 转换Markdown图片为DITA格式
+        content = self._convert_markdown_images_to_dita(content)
+        
         # 尝试检测表格
         table = self._detect_markdown_table(content)
         
@@ -416,6 +429,81 @@ class ContentStructurer:
                     }
         
         return None
+    
+    def _convert_markdown_images_to_dita(self, content: str) -> str:
+        """
+        将Markdown格式的图片链接转换为DITA的fig+image标签
+        并尝试合并后续的图片说明文字
+        
+        Args:
+            content: 包含Markdown图片链接的内容
+            
+        Returns:
+            转换后的内容
+        """
+        # 分行处理，以便识别图片和说明的上下文
+        lines = content.split('\n')
+        result_lines = []
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # 匹配Markdown图片语法: ![alt text](path)
+            image_pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
+            image_match = re.search(image_pattern, line)
+            
+            if image_match:
+                alt_text = image_match.group(1)
+                image_path = image_match.group(2)
+                
+                # 生成基础image标签
+                if alt_text:
+                    image_tag = f'<image href="{image_path}" alt="{alt_text}"/>'
+                else:
+                    image_tag = f'<image href="{image_path}"/>'
+                
+                # 检查后续几行是否是图片说明（可能有空行分隔）
+                caption = None
+                caption_end_idx = i
+                
+                # 向前查找最多3行
+                for j in range(1, min(4, len(lines) - i)):
+                    next_line = lines[i + j].strip()
+                    
+                    # 跳过空行
+                    if not next_line:
+                        continue
+                    
+                    # 匹配常见的图片说明模式
+                    caption_pattern = r'^(Figure|Fig\.|图|图片|图示|图表)\s*[\d\.]+[:\s].*'
+                    if re.match(caption_pattern, next_line, re.IGNORECASE):
+                        caption = next_line
+                        caption_end_idx = i + j
+                        break
+                    else:
+                        # 如果遇到非空行但不是图片说明，停止查找
+                        break
+                
+                # 将图片包裹在<fig>标签中
+                if caption:
+                    # 有说明：图片+说明都在fig中
+                    # 在说明后添加段落分隔标记，以便后续分段处理
+                    fig_content = f'<fig>\n        {image_tag}\n        <p>{caption}</p>\n      </fig>\n\n__FIG_END__\n'
+                    i = caption_end_idx  # 跳到说明行
+                else:
+                    # 无说明：只包裹图片
+                    fig_content = f'<fig>\n        {image_tag}\n      </fig>\n\n__FIG_END__\n'
+                
+                # 替换原行中的图片语法
+                result_line = re.sub(image_pattern, fig_content, line)
+                result_lines.append(result_line)
+            else:
+                result_lines.append(line)
+            
+            i += 1
+        
+        return '\n'.join(result_lines)
     
     # ========== 工具方法 ==========
     

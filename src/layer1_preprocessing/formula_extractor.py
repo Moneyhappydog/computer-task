@@ -355,7 +355,6 @@ class FormulaExtractor:
             blocks = text_dict.get("blocks", [])
             
             formula_candidates = []
-            line_formulas = []  # 存储行级公式
             
             for block in blocks:
                 if block.get("type") != 0:  # 只处理文本块
@@ -365,12 +364,6 @@ class FormulaExtractor:
                 
                 for line in lines:
                     spans = line.get("spans", [])
-                    
-                    # 检查整行是否是公式（块级公式检测）
-                    line_formula = self._detect_line_formula(line, page_num)
-                    if line_formula:
-                        line_formulas.append(line_formula)
-                        continue  # 如果整行是公式，跳过 span 级检测
                     
                     for span in spans:
                         text = span.get("text", "")
@@ -418,11 +411,8 @@ class FormulaExtractor:
             # 合并相邻的公式候选（同一行的连续公式片段）
             merged_formulas = self._merge_adjacent_formulas(formula_candidates, max_gap=20.0)
             
-            # 合并行级公式和片段级公式
-            all_formulas = line_formulas + merged_formulas
-            
             # 为每个检测到的公式区域截图
-            for idx, formula_info in enumerate(all_formulas):
+            for idx, formula_info in enumerate(merged_formulas):
                 bbox = formula_info['bbox']
                 width = bbox[2] - bbox[0]
                 height = bbox[3] - bbox[1]
@@ -469,123 +459,6 @@ class FormulaExtractor:
             logger.warning(f"分析页面文本时出错: {e}")
         
         return formulas
-    
-    def _detect_line_formula(
-        self,
-        line: Dict,
-        page_num: int
-    ) -> Optional[Dict[str, Any]]:
-        """
-        检测整行是否是块级公式（display formula）
-        
-        块级公式特征：
-        1. 独立成行（通常居中或缩进）
-        2. 包含多个数学符号
-        3. 整行几乎都是数学内容
-        4. 可能包含求和、积分、分数等复杂结构
-        
-        Args:
-            line: 行对象
-            page_num: 页码
-        
-        Returns:
-            公式信息字典，如果不是公式则返回 None
-        """
-        spans = line.get("spans", [])
-        if not spans:
-            return None
-        
-        # 合并整行文本
-        full_text = ''.join(span.get("text", "") for span in spans)
-        full_text = full_text.strip()
-        
-        # 空行或过短
-        if len(full_text) < 3:
-            return None
-        
-        # 数学符号集合
-        math_symbols = {
-            '∑', '∏', '∫', '∬', '∭', '∮', '∂', '∇', '√', '∛', '∜',
-            '≤', '≥', '≠', '≈', '≡', '∞', '±', '×', '÷', '∝', '∼',
-            'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ',
-            'ν', 'ξ', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω',
-            'Γ', 'Δ', 'Θ', 'Λ', 'Ξ', 'Π', 'Σ', 'Φ', 'Ψ', 'Ω',
-            '∈', '∉', '⊂', '⊃', '⊆', '⊇', '∪', '∩', '∅', '∀', '∃',
-            '→', '←', '↔', '⇒', '⇐', '⇔', '↑', '↓', '⊕', '⊗'
-        }
-        
-        # 计算数学符号数量
-        math_symbol_count = sum(1 for char in full_text if char in math_symbols)
-        
-        # 计算数学字体 span 数量
-        math_font_count = 0
-        italic_count = 0
-        for span in spans:
-            font = span.get("font", "").lower()
-            if any(kw in font for kw in ['math', 'cmmi', 'cmsy', 'symbol', 'timesi']):
-                math_font_count += 1
-            if 'italic' in font or 'timesi' in font:
-                italic_count += 1
-        
-        # 检查是否包含上下标
-        has_superscript = any(c in full_text for c in '^²³⁰¹⁴⁵⁶⁷⁸⁹')
-        has_subscript = any(c in full_text for c in '_₀₁₂₃₄₅₆₇₈₉')
-        
-        # 检查是否包含括号（多层括号是公式特征）
-        bracket_count = full_text.count('(') + full_text.count('[') + full_text.count('{')
-        
-        # 检查是否包含等号或关系运算符
-        has_equation = any(op in full_text for op in ['=', '≠', '≈', '≤', '≥', '<', '>'])
-        
-        # 检查是否居中（块级公式通常居中）
-        line_bbox = line.get("bbox", (0, 0, 0, 0))
-        
-        # 综合判断
-        is_block_formula = False
-        confidence = 0.0
-        
-        # 规则 1: 有多个数学符号（强特征）
-        if math_symbol_count >= 2:
-            is_block_formula = True
-            confidence += 0.4 + min(math_symbol_count * 0.1, 0.3)
-        
-        # 规则 2: 包含求和、积分等复杂符号
-        complex_symbols = {'∑', '∏', '∫', '∬', '∭', '∮', '∂', '∇'}
-        if any(sym in full_text for sym in complex_symbols):
-            is_block_formula = True
-            confidence += 0.5
-        
-        # 规则 3: 多个数学字体 + 上下标
-        if math_font_count >= 3 and (has_superscript or has_subscript):
-            is_block_formula = True
-            confidence += 0.3
-        
-        # 规则 4: 包含等号且有括号
-        if has_equation and bracket_count >= 2:
-            is_block_formula = True
-            confidence += 0.2
-        
-        # 规则 5: 几乎全是斜体（变量）+ 运算符
-        if italic_count >= len(spans) * 0.6 and (has_equation or math_symbol_count > 0):
-            is_block_formula = True
-            confidence += 0.2
-        
-        if not is_block_formula or confidence < 0.5:
-            return None
-        
-        # 计算整行的边界框
-        min_x = min(span.get("bbox", (999999, 0, 0, 0))[0] for span in spans)
-        min_y = min(span.get("bbox", (0, 999999, 0, 0))[1] for span in spans)
-        max_x = max(span.get("bbox", (0, 0, 0, 0))[2] for span in spans)
-        max_y = max(span.get("bbox", (0, 0, 0, 999999))[3] for span in spans)
-        
-        return {
-            'text': full_text,
-            'bbox': (min_x, min_y, max_x, max_y),
-            'confidence': min(confidence, 1.0),
-            'font': 'line-formula',
-            'type': 'block_formula'
-        }
     
     def _calculate_formula_confidence(
         self,

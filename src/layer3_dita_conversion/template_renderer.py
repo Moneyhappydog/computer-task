@@ -119,7 +119,7 @@ class TemplateRenderer:
     
     def _escape_xml(self, text: str) -> str:
         """
-        转义XML特殊字符
+        转义XML特殊字符,但保留有效的DITA标签
         
         Args:
             text: 原始文本
@@ -130,6 +130,30 @@ class TemplateRenderer:
         if not isinstance(text, str):
             return text
         
+        # 定义允许的DITA标签模式
+        # 这些标签不会被转义
+        allowed_tags = [
+            r'<fig[^>]*>[\s\S]*?</fig>',  # figure标签（必须先匹配，包含换行）
+            r'<image\s+[^>]*/>',  # 自闭合image标签
+            r'<image\s+[^>]*>.*?</image>',  # 成对的image标签
+            r'<b>.*?</b>',  # 粗体
+            r'<i>.*?</i>',  # 斜体
+            r'<ph>.*?</ph>',  # phrase
+            r'<xref\s+[^>]*>.*?</xref>',  # 交叉引用
+        ]
+        
+        # 提取所有允许的标签,用占位符替换
+        placeholders = {}
+        counter = 0
+        
+        for pattern in allowed_tags:
+            for match in re.finditer(pattern, text, re.DOTALL):
+                placeholder = f"__DITA_TAG_{counter}__"
+                placeholders[placeholder] = match.group(0)
+                text = text.replace(match.group(0), placeholder, 1)
+                counter += 1
+        
+        # 转义剩余的特殊字符
         replacements = {
             '&': '&amp;',
             '<': '&lt;',
@@ -140,6 +164,10 @@ class TemplateRenderer:
         
         for char, escape in replacements.items():
             text = text.replace(char, escape)
+        
+        # 恢复占位符为原始标签
+        for placeholder, original_tag in placeholders.items():
+            text = text.replace(placeholder, original_tag)
         
         return text
     
