@@ -1,6 +1,11 @@
 """
 测试 Layer 4 - 质量保证功能
+支持：
+1. 手动创建的测试DITA XML
+2. 从第三层输出目录读取DITA文件
 """
+import sys
+import json
 from pathlib import Path
 from src.layer4_quality_assurance.qa_manager import QAManager
 
@@ -387,8 +392,174 @@ def test_custom_rules_check():
         return False
 
 
+def test_layer3_output_directory():
+    """测试处理第三层输出目录中的所有DITA文件"""
+    print("\n" + "="*70)
+    print("🧪 测试7: 处理第三层输出目录")
+    print("="*70)
+    
+    # 默认第三层输出目录
+    default_layer3_dir = Path("data/output/2023CVPR-CoMFormer/layer3")
+    
+    # 允许从命令行参数指定目录
+    if len(sys.argv) > 1:
+        layer3_dir = Path(sys.argv[1])
+    else:
+        layer3_dir = default_layer3_dir
+    
+    if not layer3_dir.exists():
+        print(f"❌ 第三层输出目录不存在: {layer3_dir}")
+        return False
+    
+    print(f"📁 第三层输出目录: {layer3_dir}")
+    
+    # 读取所有DITA文件
+    dita_files = list(layer3_dir.glob("*.dita"))
+    
+    if not dita_files:
+        print(f"❌ 目录中没有找到DITA文件")
+        return False
+    
+    print(f"📄 找到 {len(dita_files)} 个DITA文件")
+    
+    # 读取layer3_result.json获取元数据
+    layer3_result_file = layer3_dir / "layer3_result.json"
+    layer3_metadata = {}
+    
+    if layer3_result_file.exists():
+        with open(layer3_result_file, 'r', encoding='utf-8') as f:
+            layer3_result = json.load(f)
+            print(f"✓ 读取第三层结果: {layer3_result['success']}/{layer3_result['total']} 成功")
+            
+            # 构建文件名到元数据的映射
+            for result in layer3_result.get('results', []):
+                if result['success']:
+                    # 从title生成文件名（与layer3保存时的逻辑一致）
+                    content_type = result['content_type']
+                    title = result['title']
+                    safe_title = "".join(c if c.isalnum() else '_' for c in title)[:50]
+                    
+                    # 查找匹配的文件
+                    for dita_file in dita_files:
+                        if content_type.lower() in dita_file.name.lower() and safe_title in dita_file.name:
+                            layer3_metadata[dita_file.name] = {
+                                'content_type': content_type,
+                                'title': title,
+                                'layer3_iterations': result['validation'].get('iterations', 0)
+                            }
+                            break
+    
+    # 准备批量处理的文档
+    dita_documents = []
+    
+    for dita_file in sorted(dita_files):
+        try:
+            with open(dita_file, 'r', encoding='utf-8') as f:
+                dita_xml = f.read()
+            
+            # 从文件名推断内容类型
+            filename = dita_file.name
+            if 'concept' in filename.lower():
+                content_type = 'Concept'
+            elif 'task' in filename.lower():
+                content_type = 'Task'
+            elif 'reference' in filename.lower():
+                content_type = 'Reference'
+            else:
+                content_type = 'Concept'  # 默认
+            
+            # 获取元数据
+            metadata = layer3_metadata.get(filename, {})
+            if not metadata:
+                metadata = {
+                    'content_type': content_type,
+                    'title': filename,
+                    'layer3_iterations': 0
+                }
+            
+            dita_documents.append({
+                'xml': dita_xml,
+                'type': metadata.get('content_type', content_type),
+                'metadata': {
+                    'filename': filename,
+                    'title': metadata.get('title', filename),
+                    'layer3_iterations': metadata.get('layer3_iterations', 0),
+                    'source': 'layer3_output'
+                }
+            })
+            
+            print(f"  ✓ 加载: {filename} ({metadata.get('content_type', content_type)})")
+            
+        except Exception as e:
+            print(f"  ✗ 加载失败 {filename}: {e}")
+    
+    if not dita_documents:
+        print("❌ 没有成功加载任何DITA文档")
+        return False
+    
+    print(f"\n✅ 成功加载 {len(dita_documents)} 个DITA文档")
+    
+    # 创建输出目录
+    output_dir = layer3_dir.parent / "layer4"
+    output_dir.mkdir(exist_ok=True)
+    print(f"📁 输出目录: {output_dir}")
+    
+    # 批量处理
+    try:
+        qa_manager = QAManager(use_dita_ot=False, use_ai_repair=True, max_iterations=3)
+        
+        print(f"\n📝 开始批量质量保证处理...")
+        batch_result = qa_manager.process_batch(
+            dita_documents=dita_documents,
+            output_dir=output_dir
+        )
+        
+        print("\n📊 批量处理结果:")
+        print(f"  总数: {batch_result['total']}")
+        print(f"  成功: {batch_result['success']}")
+        print(f"  失败: {batch_result['failed']}")
+        print(f"  成功率: {batch_result['success_rate']:.1%}")
+        
+        # 显示摘要统计
+        summary = batch_result['summary']
+        print(f"\n📊 质量摘要:")
+        print(f"  平均质量分数: {summary['quality_scores']['avg_overall_quality']:.2f}")
+        print(f"  平均DITA合规性: {summary['quality_scores']['avg_dita_compliance']:.2f}")
+        print(f"  平均结构质量: {summary['quality_scores']['avg_structure_quality']:.2f}")
+        print(f"  平均内容完整性: {summary['quality_scores']['avg_content_completeness']:.2f}")
+        
+        print(f"\n💾 结果已保存到: {output_dir}")
+        
+        return batch_result['success_rate'] > 0
+        
+    except Exception as e:
+        print(f"❌ 批量处理失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 if __name__ == "__main__":
     print("🧪 开始测试 Layer 4 - 质量保证功能...\n")
+    print("="*70)
+    print("💡 使用说明:")
+    print("  1. 不带参数运行: 执行所有内置测试")
+    print("  2. 带参数运行: python test_layer4.py <layer3_output_dir>")
+    print("     例如: python test_layer4.py data/output/2023CVPR-CoMFormer/layer3")
+    print("="*70)
+    
+    # 如果提供了命令行参数，只运行第三层输出测试
+    if len(sys.argv) > 1:
+        print("\n🎯 模式: 处理第三层输出目录")
+        if test_layer3_output_directory():
+            print("\n✅ 第三层输出处理成功！")
+            sys.exit(0)
+        else:
+            print("\n❌ 第三层输出处理失败！")
+            sys.exit(1)
+    
+    # 否则运行所有测试
+    print("\n🎯 模式: 运行所有内置测试")
     
     tests = [
         ("QA管理器初始化", test_qa_manager_initialization),
@@ -396,7 +567,8 @@ if __name__ == "__main__":
         ("Concept类型质量保证", test_concept_quality_assurance),
         ("Reference类型质量保证", test_reference_quality_assurance),
         ("批量文档处理", test_batch_processing),
-        ("自定义规则检查", test_custom_rules_check)
+        ("自定义规则检查", test_custom_rules_check),
+        ("处理第三层输出", test_layer3_output_directory)
     ]
     
     passed = 0
