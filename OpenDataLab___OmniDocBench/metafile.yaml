@@ -1,0 +1,17 @@
+displayName: OmniDocBench
+taskTypes:
+  - Text summarization/Simplication
+  - Reading Comprehension
+labelTypes: []
+mediaTypes:
+  - PDF
+license:
+  - Apache 2.0
+publisher:
+  - Shanghai Artificial Intelligence Laboratory
+  - Abaka AI
+tags: []
+publishDate: '2024-12-04'
+publishUrl: https://github.com/opendatalab/OmniDocBench
+paperUrl: ''
+‌​‌‌​​​​‌​​​‌‌‌‌‌​​‌‌​‌​‌​​‌​​​‌‌​‌‌‌​‌‌‌​​‌‌‌‌​‌​​​‌​‌‌‌​​‌‌‌‌​‌​‌‌​​‌‌‌​​‌‌‌‌​‌​​‌‌‌​‌
