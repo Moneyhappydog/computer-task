@@ -15,24 +15,32 @@ from utils.logger import setup_logger
 from utils.config import Config
 from .ocr_processor import OCRProcessor
 from .image_extractor import ImageExtractor
+from .table_extractor import TableExtractor
+from .chart_detector import ChartDetector
 
 logger = setup_logger(__name__)
 
 class PDFProcessor:
     """PDF智能处理器（优先使用marker-pdf）"""
     
-    def __init__(self, use_marker: bool = True, use_ocr: bool = True):  # OCR默认开启，无需手动指定即可自动启用OCR功能
+    def __init__(self, use_marker: bool = True, use_ocr: bool = True, 
+                 extract_tables: bool = True, tables_as_images: bool = True):
         """
         初始化PDF处理器
         
         Args:
             use_marker: 是否尝试使用marker-pdf（深度学习方案）
             use_ocr: 是否在需要时自动使用OCR
+            extract_tables: 是否单独提取表格（提高表格质量）
+            tables_as_images: 是否将表格提取为图片（推荐，对复杂表格效果更好）
         """
         self.use_marker = use_marker
         self.use_ocr = use_ocr
+        self.extract_tables = extract_tables
+        self.tables_as_images = tables_as_images
         self.marker_models = None
         self.ocr_processor = None
+        self.table_extractor = None
         
         # 设置环境变量以优化内存使用
         os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
@@ -47,6 +55,23 @@ class PDFProcessor:
             except Exception as e:
                 logger.warning(f"OCR处理器初始化失败，将不使用OCR: {e}")
                 self.use_ocr = False
+        
+        # 初始化表格提取器
+        if extract_tables:
+            try:
+                self.table_extractor = TableExtractor(extract_as_image=tables_as_images)
+                logger.success(f"✓ 表格提取器初始化成功 (模式: {'图片' if tables_as_images else '文本'})")
+            except Exception as e:
+                logger.warning(f"表格提取器初始化失败，将不单独提取表格: {e}")
+                self.extract_tables = False
+        
+        # 初始化图表检测器（默认启用）
+        try:
+            self.chart_detector = ChartDetector()
+            logger.success("✓ 图表检测器初始化成功")
+        except Exception as e:
+            logger.warning(f"图表检测器初始化失败: {e}")
+            self.chart_detector = None
         
         if self.use_marker:
             try:
@@ -273,6 +298,66 @@ class PDFProcessor:
             result = self.extract_text(file_path)
             markdown_text = result.get('text', '')
             
+            # 清理图表OCR乱码（优先处理）
+            if self.chart_detector and result.get('image_mapping'):
+                try:
+                    logger.info("开始清理图表OCR乱码...")
+                    markdown_text = self.chart_detector.clean_markdown(
+                        markdown_text,
+                        result.get('image_mapping', {})
+                    )
+                except Exception as e:
+                    logger.warning(f"图表乱码清理失败: {e}")
+            
+            # 单独提取表格（提高表格质量）
+            tables = []
+            table_images = []
+            if self.extract_tables and self.table_extractor:
+                try:
+                    logger.info("开始单独提取表格...")
+                    
+                    # 在这里导入 Config 以避免循环引用
+                    from utils.config import Config as AppConfig
+                    
+                    if self.tables_as_images:
+                        # 表格提取为图片模式（推荐）
+                        doc_name = file_path.stem
+                        image_dir = Path(AppConfig.OUTPUT_DIR) / doc_name / "images"
+                        
+                        table_images = self.table_extractor.extract_tables_as_images(
+                            file_path,
+                            output_dir=image_dir
+                        )
+                        
+                        if table_images:
+                            # 将 Markdown 中的表格替换为图片引用
+                            markdown_text = self.table_extractor.replace_tables_with_images(
+                                markdown_text,
+                                table_images,
+                                images_relative_path="../images"
+                            )
+                            logger.success(f"✓ 表格图片提取完成: {len(table_images)} 个表格")
+                    else:
+                        # 表格提取为 Markdown 文本模式
+                        tables = self.table_extractor.extract_tables_from_pdf(file_path)
+                        
+                        if tables:
+                            # 将高质量表格合并到 Markdown 中
+                            markdown_text = self.table_extractor.merge_tables_into_markdown(
+                                markdown_text,
+                                tables,
+                                strategy='replace'  # 替换原有的劣质表格
+                            )
+                            
+                            # 获取统计信息
+                            table_stats = self.table_extractor.get_table_statistics(tables)
+                            logger.success(f"✓ 表格提取完成: {table_stats['total_tables']} 个表格, "
+                                         f"平均置信度: {table_stats['avg_confidence']}")
+                except Exception as e:
+                    logger.warning(f"表格提取失败: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
             # 保存输出到 data/output/{doc_name}/layer1/
             from utils.config import Config
             import re
@@ -287,7 +372,7 @@ class PDFProcessor:
             
             # 转换为统一格式
             return {
-                'markdown': markdown_text,  # 返回修正后的文本
+                'markdown': markdown_text,  # 返回修正后的文本（已包含表格）
                 'metadata': {
                     'file_name': file_path.name,
                     'file_type': 'pdf',
@@ -296,13 +381,18 @@ class PDFProcessor:
                     'raw_metadata': result.get('metadata', {}),
                     'image_dir': result.get('image_dir'),
                     'image_count': len(result.get('image_mapping', {})),
+                    'table_count': len(tables) + len(table_images),
+                    'table_as_images': self.tables_as_images,
+                    'table_quality': self.table_extractor.get_table_statistics(tables) if tables else None,
                     'output_file': str(markdown_file)
                 },
                 'success': True,
                 'pages': result.get('pages', []),
                 'raw_result': result,
                 'image_mapping': result.get('image_mapping', {}),
-                'image_dir': result.get('image_dir')
+                'image_dir': result.get('image_dir'),
+                'tables': tables,  # 表格文本数据
+                'table_images': table_images  # 表格图片数据
             }
             
         except Exception as e:

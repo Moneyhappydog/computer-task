@@ -7,11 +7,15 @@ from .word_processor import WordProcessor
 from .ocr_processor import OCRProcessor
 from .file_router import FileRouter
 from .image_extractor import ImageExtractor
+from .table_extractor import TableExtractor
+from .chart_detector import ChartDetector
 
 __all__ = [
     'PDFProcessor',
     'WordProcessor',
     'OCRProcessor',
     'FileRouter',
-    'ImageExtractor'
+    'ImageExtractor',
+    'TableExtractor',
+    'ChartDetector'
 ]
