@@ -40,11 +40,3 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# 忽略所有常见图片文件
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.bmp
-*.tiff
-*.svg
