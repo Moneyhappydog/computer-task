@@ -1,0 +1,52 @@
+{
+  "extracted_items": [
+    {
+      "type": "inline_text",
+      "content": "The goal of image segmentation is to learn a model able to (i) partition the image into a set of $N$ regions represented by binary masks and (ii) produce a class-probability distribution associated with each region."
+    },
+    {
+      "type": "inline_text",
+      "content": "Formally, during the learning step $t$, a dataset $D_t$ consisting of a collection of image and label pairs is provided."
+    },
+    {
+      "type": "inline_text",
+      "content": "The label of each image takes the form of a set of $N$ ground truth segments $s^t = \\{(c^t_i, m^t_i)\\}^N_{i=1} \\subseteq \\mathcal{K}^t$, $m^t_i \\in \\{0, 1\\}^{H \\times W}$."
+    },
+    {
+      "type": "inline_text",
+      "content": "$c^t_i$ is the ground-truth class and $m^t_i$ is binary mask $m^t_i$."
+    },
+    {
+      "type": "inline_text",
+      "content": "$\\mathcal{K}^t$ is the set of classes introduced at step $t$, and $H, W$ are the height and width of the images."
+    },
+    {
+      "type": "inline_text",
+      "content": "The goal of training step $t$ is to learn a model able to predict segments for all the seen classes $\\mathcal{K}^{1:t}$."
+    },
+    {
+      "type": "inline_text",
+      "content": "We note that the dataset only contains annotations for the new classes $\\mathcal{K}^t$ while not reporting ground-truth segments for old $\\mathcal{K}^{1:t-1}$ or future $\\mathcal{K}^{t+1:T}$ classes."
+    },
+    {
+      "type": "inline_text",
+      "content": "Formally, the output of a CoMFormer is $z = \\{(p_i, m_i)\\}^N_{i=1}$ where $p_i$ represents a class probability distribution over the seen classes, i.e., $p_i \\in \\Delta^{K^{1:t}}$ with $K^{1:t} = |\\mathcal{K}^{1:t}|$, and $m_i$ is a binary mask such that $m_i \\in \\{0, 1\\}^{H \\times W}$."
+    },
+    {
+      "type": "inline_text",
+      "content": "We note that $p_i$ contains an additional \"no object\" class (denoted $\\oslash$) to indicate that the mask does not correspond to any of the known $\\mathcal{K}^{1:t}$ categories."
+    },
+    {
+      "type": "inline_text",
+      "content": "The CoMFormer architecture, showcased in Fig. 2, is made of three components: (i) a backbone that extracts feature embeddings $\\mathcal{E}_{feat}$, (ii) a transformer decoder that takes as input $N$ learned queries and $\\mathcal{E}_{feat}$ to output $N$ per-segment embeddings $Q$, (iii) a pixel decoder that takes $\\mathcal{E}_{feat}$ as input and extracts per-pixel embeddings $\\mathcal{E}_{pixel}$."
+    },
+    {
+      "type": "inline_text",
+      "content": "The output class probabilities $\\{p_i \\in \\Delta^{K^{1:t+1}}\\}^N_{i=1}$ are obtained by applying a linear classifier on $Q$, which is enlarged as new classes are presented."
+    },
+    {
+      "type": "inline_text",
+      "content": "We obtain the mask predictions $m_i$ combining $Q$ and $\\mathcal{E}_{pixel}$: first $Q$ is passed into a 2-layer MLP to obtain $N$ mask embeddings $\\mathcal{E}_{mask}$ and we then compute the dot product between the $i$-th mask embedding and the pixel embeddings, followed by the softmax activation: $m_i[h, w] = \\text{softmax}(\\mathcal{E}_{mask, i}[:].T \\cdot \\mathcal{E}_{pixel, h, w})$."
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "extracted_items": [
+    {
+      "type": "inline_text",
+      "content": "In Tab. 6 we report additional experiments on Continual Panoptic Segmentation on the 50-50 setting where we perform three tasks of 50 classes."
+    },
+    {
+      "type": "display_formula",
+      "content": "\\begin{array}{|c|c|c|c|c|} \\hline \\text{Method} & 1-50 & 51-150 & \\text{avg} & \\text{all} \\\\ \\hline \\text{FT} & 0.0 & 14.3 & 23.1 & 9.5 \\\\ \\text{MiB} & 33.6 & 16.3 & 31.8 & 22.1 \\\\ \\text{PLOP} & 44.7 & 26.3 & 37.9 & 32.4 \\\\ \\text{CoMFormer} & \\mathbf{45.2} & \\mathbf{26.5} & \\mathbf{37.9} & \\mathbf{32.7} \\\\ \\text{Joint} & - & - & - & 39.5 \\\\ \\hline \\end{array}"
+    },
+    {
+      "type": "inline_text",
+      "content": "CoMFormer outperforms all the baselines, obtaining the best results on both old and new classes."
+    },
+    {
+      "type": "inline_text",
+      "content": "In particular, we can see that it exceeds the best competitor, PLOP, by 0.5 PQ on the old classes and 2.0 PQ in the new ones."
+    },
+    {
+      "type": "inline_text",
+      "content": "When comparing with MiB, however, we can see that the gap is more relevant: +11.6 PQ on old classes and +10.2 on the new ones."
+    },
+    {
+      "type": "inline_text",
+      "content": "Finally, we can see that CoMFormer obtains a small performance gap with the Joint baselines, which is more relevant for the new classes (-7.6 PQ)."
+    },
+    {
+      "type": "inline_text",
+      "content": "Tab. 7 reports the additional results on the Continual Semantic Segmentation benchmark on the 50-50 setting in mIoU, comparing CoMFormer with previous works based on DeepLab-v3 and our re-implementation based on the CoMFormer architecture, both in Per-Pixel and Mask-Based fashion."
+    },
+    {
+      "type": "display_formula",
+      "content": "\\begin{array}{|c|c|c|c|c|} \\hline \\text{Architecture} & \\text{Method} & 1-50 & 51-150 & \\text{avg} & \\text{all} \\\\ \\hline \\text{DeepLab-v3} & \\text{PLOP} & 15 & 48.6 & 21.6 & 39.4 & 30.4 \\\\ & \\text{RCIL} & 48.3 & 25.0 & - & 32.5 \\\\ \\text{Per-Pixel} & \\text{MiB} & 44.9 & 25.4 & 35.0 & 31.9 \\\\ & \\text{PLOP} & 43.2 & 24.7 & 34.6 & 30.9 \\\\ & \\text{FT} & 0.0 & 13.3 & 12.8 & 8.9 \\\\ \\text{Mask-Based} & \\text{MiB} & 24.6 & 19.4 & 25.8 & 21.1 \\\\ & \\text{PLOP} & 48.1 & 26.6 & 36.5 & 33.8 \\\\ & \\text{CoMFormer} & \\mathbf{49.2} & \\mathbf{26.6} & \\mathbf{36.6} & \\mathbf{34.1} \\\\ \\text{Joint} & - & 53.4 & 38.0 & - & 43.1 \\\\ \\hline \\end{array}"
+    },
+    {
+      "type": "inline_text",
+      "content": "We observe that CoMFormer achieves a new state of the art."
+    },
+    {
+      "type": "inline_text",
+      "content": "In particular, when comparing it with previous works, we can see that it outperforms the best baseline (RCIL) on both old (40.9 mIoU) and new classes (+1.6 mIoU), for an overall improvement of 1.6 mIoU."
+    },
+    {
+      "type": "inline_text",
+      "content": "Furthermore, CoMFormer also outperforms the baselines implemented on the same architecture: w.r.t. Per-Pixel baselines, there is a relevant performance gap, especially regarding the old classes (CoMFormer 49.2 vs MiB 44.9 mIoU)."
+    },
+    {
+      "type": "inline_text",
+      "content": "Considering the Mask-Based baselines, CoMFormer shows the best performance, improving PLOP by 1.1 mIoU on the old classes and by 0.3 mIoU on all."
+    }
+  ]
+}

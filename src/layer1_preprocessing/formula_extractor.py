@@ -1,719 +1,173 @@
-"""
-公式提取器
-从 PDF 文档中提取公式图片，并使用 OCR 转换为 LaTeX 代码
-"""
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
 import logging
-import re
-from PIL import Image
-import io
-import fitz  # PyMuPDF
+import base64
+import json
+import os
+from pathlib import Path
+from io import BytesIO
+import sys
 
+import fitz  # PyMuPDF
+from PIL import Image
+
+# 添加项目根目录到 sys.path
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# 尝试导入 OpenAI
+try:
+    from openai import OpenAI
+    from response.gpt import openai_api_key
+    API_DEPS_AVAILABLE = True
+except ImportError:
+    API_DEPS_AVAILABLE = False
+    openai_api_key = None
+
+# 配置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class FormulaExtractor:
-    """公式提取与 LaTeX 转换器"""
-    
-    def __init__(self, output_base_dir: Path = None, use_ocr: bool = True):
-        """
-        初始化公式提取器
-        
-        Args:
-            output_base_dir: 公式图片输出根目录，默认为 data/output
-            use_ocr: 是否使用 OCR 将公式转换为 LaTeX（需要安装 pix2tex）
-        """
+class GPTFormulaExtractorJSON:
+    """
+    GPT-4o 整页公式提取器 (JSON版)
+    说明：不进行图片裁剪，而是直接识别图片内容，将公式及上下文提取为 JSON 数据。
+    """
+    def __init__(self, output_base_dir: Path = None, api_key: str = None):
         if output_base_dir is None:
-            from src.utils.config import Config
-            output_base_dir = Config.OUTPUT_DIR
-        
+            output_base_dir = "data/output_json"
         self.output_base_dir = Path(output_base_dir)
-        self.use_ocr = use_ocr
         
-        # 尝试导入 pix2tex
-        self.ocr_model = None
-        if use_ocr:
-            try:
-                from pix2tex.cli import LatexOCR
-                self.ocr_model = LatexOCR()
-                logger.info("✅ LaTeX OCR 模型加载成功")
-            except ImportError:
-                logger.warning("⚠️ pix2tex 未安装，无法进行公式 OCR")
-                logger.warning("安装命令: pip install pix2tex")
-                self.use_ocr = False
-            except Exception as e:
-                logger.warning(f"⚠️ LaTeX OCR 模型加载失败: {e}")
-                self.use_ocr = False
-        
-        logger.info("✅ 公式提取器初始化完成")
-    
-    def extract_formulas_from_pdf(
-        self,
-        pdf_path: Path,
-        doc_name: str,
-        min_formula_height: int = 15,
-        min_formula_width: int = 30
-    ) -> Dict[str, Any]:
-        """
-        从 PDF 中提取公式图片
-        
-        Args:
-            pdf_path: PDF 文件路径
-            doc_name: 文档名称（不含扩展名），用作文件夹名
-            min_formula_height: 最小公式高度（像素），用于过滤噪声
-            min_formula_width: 最小公式宽度（像素）
-        
-        Returns:
-            {
-                'formula_mapping': {'page2_formula3': '../formulas/page2_formula3.png', ...},
-                'formula_latex': {'page2_formula3': '\\frac{a}{b}', ...},
-                'formula_dir': '/absolute/path/to/formulas',
-                'total_formulas': 10,
-                'saved_formulas': 10,
-                'ocr_success': 8,
-                'ocr_failed': 2
-            }
-        """
-        logger.info(f"开始提取公式: PDF={pdf_path}, 文档={doc_name}")
-        
-        # 创建公式输出目录: data/output/{doc_name}/formulas
-        formula_dir = self.output_base_dir / doc_name / "formulas"
-        formula_dir.mkdir(parents=True, exist_ok=True)
-        
-        formula_mapping = {}
-        formula_latex = {}
-        total_count = 0
-        saved_count = 0
-        ocr_success = 0
-        ocr_failed = 0
-        
-        try:
-            # 打开 PDF
-            doc = fitz.open(pdf_path)
-            logger.info(f"PDF 总页数: {len(doc)}")
-            
-            for page_num in range(len(doc)):
-                page = doc[page_num]
-                logger.debug(f"处理第 {page_num + 1} 页...")
-                
-                # 提取页面中的图片和公式区域
-                formulas = self._detect_formulas_on_page(
-                    page, 
-                    page_num,
-                    min_formula_height,
-                    min_formula_width
-                )
-                
-                # 保存提取的公式
-                for formula_idx, formula_data in enumerate(formulas):
-                    total_count += 1
-                    
-                    # 生成文件名: page{页码}_formula{编号}
-                    formula_name = f"page{page_num + 1}_formula{formula_idx + 1}"
-                    formula_filename = f"{formula_name}.png"
-                    formula_path = formula_dir / formula_filename
-                    
-                    try:
-                        # 保存公式图片
-                        formula_image = formula_data['image']
-                        formula_image.save(formula_path, 'PNG')
-                        
-                        # 记录相对路径（相对于 Markdown 文件所在的 layer1 目录）
-                        relative_path = f"../formulas/{formula_filename}"
-                        formula_mapping[formula_name] = relative_path
-                        
-                        saved_count += 1
-                        logger.debug(f"已保存公式: {formula_filename}")
-                        
-                        # OCR 识别公式
-                        if self.use_ocr and self.ocr_model:
-                            try:
-                                latex_code = self._ocr_formula_to_latex(formula_image)
-                                formula_latex[formula_name] = latex_code
-                                ocr_success += 1
-                                logger.debug(f"OCR 成功: {formula_name} -> {latex_code[:50]}...")
-                            except Exception as e:
-                                ocr_failed += 1
-                                logger.warning(f"OCR 失败 {formula_name}: {e}")
-                                # 保存空的 LaTeX，后续可以手动补充
-                                formula_latex[formula_name] = ""
-                        
-                    except Exception as e:
-                        logger.warning(f"保存公式失败 {formula_filename}: {e}")
-            
-            doc.close()
-            
-        except Exception as e:
-            logger.error(f"提取公式时出错: {e}")
-            raise
-        
-        result = {
-            'formula_mapping': formula_mapping,
-            'formula_latex': formula_latex,
-            'formula_dir': str(formula_dir),
-            'relative_formula_dir': f"{doc_name}/formulas",
-            'total_formulas': total_count,
-            'saved_formulas': saved_count,
-            'ocr_success': ocr_success,
-            'ocr_failed': ocr_failed
-        }
-        
-        logger.info(f"✅ 公式提取完成: 总数={total_count}, 成功={saved_count}, OCR成功={ocr_success}")
-        
-        return result
-    
-    def _detect_formulas_on_page(
-        self,
-        page: fitz.Page,
-        page_num: int,
-        min_height: int,
-        min_width: int
-    ) -> List[Dict[str, Any]]:
-        """
-        检测页面中的公式区域
-        
-        策略：
-        1. 提取页面中的所有图片块（独立公式图片）
-        2. 分析文本块，检测内联公式（基于数学符号、字体、上下标）
-        3. 根据位置和大小过滤
-        
-        Args:
-            page: PDF 页面对象
-            page_num: 页码
-            min_height: 最小高度
-            min_width: 最小宽度
-        
-        Returns:
-            公式数据列表 [{'image': PIL.Image, 'bbox': (x0, y0, x1, y1), 'type': 'image'}, ...]
-        """
-        formulas = []
-        
-        # 方法 1: 提取页面中的所有图片（可能包含公式）
-        image_list = page.get_images(full=True)
-        
-        for img_index, img_info in enumerate(image_list):
-            try:
-                xref = img_info[0]
-                
-                # 获取图片位置
-                rects = page.get_image_rects(xref)
-                if not rects:
-                    continue
-                
-                rect = rects[0]  # 使用第一个矩形
-                bbox = (rect.x0, rect.y0, rect.x1, rect.y1)
-                width = rect.width
-                height = rect.height
-                
-                # 过滤太小的图片（可能是图标、装饰等）
-                if width < min_width or height < min_height:
-                    continue
-                
-                # 提取图片数据
-                base_image = page.parent.extract_image(xref)
-                image_bytes = base_image["image"]
-                
-                # 转换为 PIL Image
-                image = Image.open(io.BytesIO(image_bytes))
-                
-                # 判断是否可能是公式（简单启发式规则）
-                is_likely_formula = self._is_likely_formula(image, width, height)
-                
-                if is_likely_formula:
-                    formulas.append({
-                        'image': image,
-                        'bbox': bbox,
-                        'type': 'embedded_image',
-                        'page': page_num + 1
-                    })
-                    logger.debug(f"检测到潜在公式图片: page {page_num + 1}, bbox={bbox}")
-                
-            except Exception as e:
-                logger.debug(f"处理图片 {img_index} 时出错: {e}")
-                continue
-        
-        # 方法 2: 基于文本分析检测内联公式
-        inline_formulas = self._detect_inline_formulas(page, page_num, min_height, min_width)
-        formulas.extend(inline_formulas)
-        
-        return formulas
-    
-    def _is_likely_formula(self, image: Image.Image, width: float, height: float) -> bool:
-        """
-        判断图片是否可能是公式
-        
-        启发式规则：
-        1. 长宽比接近公式（一般是横向的，长宽比 > 1）
-        2. 尺寸适中（不是超大图片）
-        3. 颜色简单（公式通常是黑白或简单色彩）
-        4. 主要是黑白色（排除彩色照片）
-        
-        Args:
-            image: PIL Image 对象
-            width: 图片宽度
-            height: 图片高度
-        
-        Returns:
-            是否可能是公式
-        """
-        # 规则 1: 长宽比检查（公式通常是横向的）
-        aspect_ratio = width / height if height > 0 else 0
-        if aspect_ratio < 0.5 or aspect_ratio > 20:
-            # 太窄或太宽，可能不是公式
-            return False
-        
-        # 规则 2: 尺寸检查（排除过大的图片，如插图、照片）
-        if width > 600 or height > 300:
-            # 公式通常不会太大
-            return False
-        
-        # 规则 3: 排除过小的图片（可能是图标、装饰）
-        if width < 30 or height < 10:
-            return False
-        
-        # 规则 4: 颜色复杂度检查（公式通常颜色简单）
-        try:
-            # 转为灰度图检查
-            gray_image = image.convert('L')
-            colors = gray_image.getcolors(maxcolors=256)
-            
-            if colors:
-                # 公式通常颜色数量很少（主要是黑白）
-                if len(colors) > 30:
-                    return False
-                
-                # 检查是否主要是黑白色
-                # 计算亮度分布
-                total_pixels = sum(count for count, _ in colors)
-                dark_pixels = sum(count for count, value in colors if value < 128)
-                light_pixels = sum(count for count, value in colors if value >= 128)
-                
-                # 如果亮度分布过于均匀，可能是照片
-                if 0.3 < (dark_pixels / total_pixels) < 0.7:
-                    # 检查是否是彩色图片
-                    if image.mode in ('RGB', 'RGBA'):
-                        # 计算颜色方差，彩色照片方差大
-                        import numpy as np
-                        img_array = np.array(image)
-                        if len(img_array.shape) == 3:
-                            color_variance = np.var(img_array, axis=(0, 1)).mean()
-                            if color_variance > 1000:  # 彩色照片方差通常很大
-                                return False
-        except Exception:
-            pass
-        
-        # 默认认为可能是公式
-        return True
-    
-    def _detect_inline_formulas(
-        self,
-        page: fitz.Page,
-        page_num: int,
-        min_height: int,
-        min_width: int
-    ) -> List[Dict[str, Any]]:
-        """
-        检测页面中的内联公式（与文本混排的公式）
-        
-        策略：
-        1. 提取页面的详细文本信息（包括字体、位置）
-        2. 识别数学符号、特殊字体、上下标
-        3. 截取识别到的公式区域为图片
-        
-        Args:
-            page: PDF 页面对象
-            page_num: 页码
-            min_height: 最小高度
-            min_width: 最小宽度
-        
-        Returns:
-            公式数据列表
-        """
-        formulas = []
-        
-        # 数学符号集合（常见的 LaTeX 数学符号）
-        math_symbols = {
-            '∑', '∏', '∫', '∬', '∭', '∮', '∂', '∇', '√', '∛', '∜',
-            '≤', '≥', '≠', '≈', '≡', '∞', '±', '×', '÷', '∝', '∼',
-            'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ',
-            'ν', 'ξ', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω',
-            'Γ', 'Δ', 'Θ', 'Λ', 'Ξ', 'Π', 'Σ', 'Φ', 'Ψ', 'Ω',
-            '∈', '∉', '⊂', '⊃', '⊆', '⊇', '∪', '∩', '∅', '∀', '∃',
-            '→', '←', '↔', '⇒', '⇐', '⇔', '↑', '↓', '⊕', '⊗'
-        }
-        
-        # 数学字体名称关键词
-        math_font_keywords = [
-            'math', 'cmmi', 'cmsy', 'cmex', 'msam', 'msbm',
-            'mathtype', 'symbol', 'times-italic', 'timesi',
-            'cambria-math', 'latinmodern-math'
-        ]
-        
-        try:
-            # 获取详细文本信息
-            text_dict = page.get_text("dict")
-            blocks = text_dict.get("blocks", [])
-            
-            formula_candidates = []
-            
-            for block in blocks:
-                if block.get("type") != 0:  # 只处理文本块
-                    continue
-                
-                lines = block.get("lines", [])
-                
-                for line in lines:
-                    spans = line.get("spans", [])
-                    
-                    for span in spans:
-                        text = span.get("text", "")
-                        font = span.get("font", "").lower()
-                        bbox = span.get("bbox", (0, 0, 0, 0))
-                        
-                        # 检查是否包含数学符号
-                        has_math_symbol = any(sym in text for sym in math_symbols)
-                        
-                        # 检查是否是数学字体
-                        is_math_font = any(keyword in font for keyword in math_font_keywords)
-                        
-                        # 检查是否包含上下标模式（如 x^2, a_i）
-                        has_superscript = '^' in text or '²' in text or '³' in text
-                        has_subscript = '_' in text or '₀' in text or '₁' in text
-                        
-                        # 检查是否包含分数、括号等模式
-                        has_fraction_pattern = '/' in text and any(c.isdigit() for c in text)
-                        has_complex_brackets = text.count('(') + text.count('[') + text.count('{') > 1
-                        
-                        # 综合判断
-                        is_formula = (
-                            has_math_symbol or 
-                            (is_math_font and len(text.strip()) > 1) or
-                            has_superscript or 
-                            has_subscript or
-                            has_fraction_pattern or
-                            has_complex_brackets
-                        )
-                        
-                        if is_formula:
-                            confidence = self._calculate_formula_confidence(
-                                text, font, has_math_symbol, is_math_font
-                            )
-                            
-                            # 只保留置信度较高的候选
-                            if confidence >= 0.3:  # 设置最低置信度阈值
-                                formula_candidates.append({
-                                    'text': text,
-                                    'bbox': bbox,
-                                    'font': font,
-                                    'confidence': confidence
-                                })
-            
-            # 合并相邻的公式候选（同一行的连续公式片段）
-            merged_formulas = self._merge_adjacent_formulas(formula_candidates, max_gap=20.0)
-            
-            # 为每个检测到的公式区域截图
-            for idx, formula_info in enumerate(merged_formulas):
-                bbox = formula_info['bbox']
-                width = bbox[2] - bbox[0]
-                height = bbox[3] - bbox[1]
-                
-                # 过滤太小的区域（提高最小宽度要求）
-                if width < max(min_width, 40) or height < min_height:
-                    continue
-                
-                # 过滤置信度太低的
-                if formula_info['confidence'] < 0.4:
-                    continue
-                
-                # 扩展边界（留一些边距）
-                margin = 2
-                expanded_bbox = fitz.Rect(
-                    max(0, bbox[0] - margin),
-                    max(0, bbox[1] - margin),
-                    min(page.rect.width, bbox[2] + margin),
-                    min(page.rect.height, bbox[3] + margin)
-                )
-                
-                try:
-                    # 截取区域为图片
-                    pix = page.get_pixmap(clip=expanded_bbox, matrix=fitz.Matrix(2, 2))  # 2倍分辨率
-                    img_data = pix.tobytes("png")
-                    image = Image.open(io.BytesIO(img_data))
-                    
-                    formulas.append({
-                        'image': image,
-                        'bbox': tuple(bbox),
-                        'type': 'inline_formula',
-                        'page': page_num + 1,
-                        'text': formula_info['text'],
-                        'confidence': formula_info['confidence']
-                    })
-                    
-                    logger.debug(f"检测到内联公式: page {page_num + 1}, text='{formula_info['text'][:30]}...', confidence={formula_info['confidence']:.2f}")
-                    
-                except Exception as e:
-                    logger.debug(f"截取公式区域失败: {e}")
-                    continue
-        
-        except Exception as e:
-            logger.warning(f"分析页面文本时出错: {e}")
-        
-        return formulas
-    
-    def _calculate_formula_confidence(
-        self,
-        text: str,
-        font: str,
-        has_math_symbol: bool,
-        is_math_font: bool
-    ) -> float:
-        """
-        计算文本块是公式的置信度
-        
-        Args:
-            text: 文本内容
-            font: 字体名称
-            has_math_symbol: 是否包含数学符号
-            is_math_font: 是否是数学字体
-        
-        Returns:
-            置信度分数 (0-1)
-        """
-        score = 0.0
-        
-        if has_math_symbol:
-            score += 0.6  # 提高数学符号权重
-        
-        if is_math_font:
-            score += 0.2
-        
-        # 检查复杂度（字符种类多样性）
-        unique_chars = len(set(text))
-        if unique_chars > 3:
-            score += 0.1
-        
-        # 检查是否包含运算符
-        operators = {'+', '-', '=', '<', '>', '∈', '∀', '∃', '×', '÷'}
-        if any(op in text for op in operators):
-            score += 0.15
-        
-        # 检查是否包含括号（公式常见）
-        if any(ch in text for ch in '()[]{}'):
-            score += 0.1
-        
-        # 惩罚纯文本（没有数学特征）
-        if not has_math_symbol and not is_math_font:
-            score *= 0.5
-        
-        return min(score, 1.0)
-    
-    def _merge_adjacent_formulas(
-        self,
-        candidates: List[Dict],
-        max_gap: float = 10.0
-    ) -> List[Dict]:
-        """
-        合并相邻的公式片段（同一行的连续公式）
-        
-        Args:
-            candidates: 公式候选列表
-            max_gap: 最大间隔距离（像素）
-        
-        Returns:
-            合并后的公式列表
-        """
-        if not candidates:
-            return []
-        
-        # 按垂直位置排序（同一行的在一起）
-        candidates.sort(key=lambda x: (x['bbox'][1], x['bbox'][0]))
-        
-        merged = []
-        current_group = [candidates[0]]
-        
-        for i in range(1, len(candidates)):
-            prev_bbox = current_group[-1]['bbox']
-            curr_bbox = candidates[i]['bbox']
-            
-            # 检查是否在同一行（y坐标相近）
-            vertical_gap = abs(curr_bbox[1] - prev_bbox[1])
-            horizontal_gap = curr_bbox[0] - prev_bbox[2]
-            
-            if vertical_gap < 5 and horizontal_gap < max_gap:
-                # 同一行且距离近，合并
-                current_group.append(candidates[i])
+        if api_key:
+            if API_DEPS_AVAILABLE:
+                self.client = OpenAI(api_key=api_key)
+                logger.info("✅ [API] OpenAI Client 已初始化")
             else:
-                # 新的一组
-                if current_group:
-                    merged.append(self._merge_group(current_group))
-                current_group = [candidates[i]]
-        
-        # 处理最后一组
-        if current_group:
-            merged.append(self._merge_group(current_group))
-        
-        return merged
-    
-    def _merge_group(self, group: List[Dict]) -> Dict:
-        """
-        合并一组公式片段
-        
-        Args:
-            group: 公式片段列表
-        
-        Returns:
-            合并后的公式信息
-        """
-        # 合并文本
-        text = ' '.join(item['text'] for item in group)
-        
-        # 合并边界框
-        min_x = min(item['bbox'][0] for item in group)
-        min_y = min(item['bbox'][1] for item in group)
-        max_x = max(item['bbox'][2] for item in group)
-        max_y = max(item['bbox'][3] for item in group)
-        
-        # 平均置信度
-        avg_confidence = sum(item['confidence'] for item in group) / len(group)
-        
-        return {
-            'text': text,
-            'bbox': (min_x, min_y, max_x, max_y),
-            'confidence': avg_confidence,
-            'font': group[0]['font']
-        }
-    
-    def _ocr_formula_to_latex(self, image: Image.Image) -> str:
-        """
-        使用 OCR 将公式图片转换为 LaTeX 代码
-        
-        Args:
-            image: PIL Image 对象
-        
-        Returns:
-            LaTeX 代码字符串
-        """
-        if not self.ocr_model:
-            raise RuntimeError("OCR 模型未加载")
-        
-        # 使用 pix2tex 进行 OCR
-        latex_code = self.ocr_model(image)
-        
-        # 清理和格式化 LaTeX 代码
-        latex_code = latex_code.strip()
-        
-        return latex_code
-    
-    def save_latex_to_json(
-        self,
-        formula_latex: Dict[str, str],
-        doc_name: str
-    ) -> Path:
-        """
-        将 LaTeX 代码保存到 JSON 文件
-        
-        Args:
-            formula_latex: 公式 LaTeX 映射
-            doc_name: 文档名称
-        
-        Returns:
-            JSON 文件路径
-        """
-        import json
-        
-        output_file = self.output_base_dir / doc_name / "formulas" / "formulas_latex.json"
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(formula_latex, f, ensure_ascii=False, indent=2)
-        
-        logger.info(f"✅ LaTeX 代码已保存到: {output_file}")
-        
-        return output_file
-    
-    def get_formula_statistics(self, formula_mapping: Dict) -> Dict[str, Any]:
-        """
-        获取公式统计信息
-        
-        Args:
-            formula_mapping: 公式路径映射
-        
-        Returns:
-            统计信息字典
-        """
-        total_formulas = len(formula_mapping)
-        
-        # 按页码分组统计
-        page_distribution = {}
-        for formula_name in formula_mapping.keys():
-            # formula_name 格式: "page2_formula3"
-            if 'page' in formula_name and '_formula' in formula_name:
-                page_num = formula_name.split('_formula')[0]  # "page2"
-                page_distribution[page_num] = page_distribution.get(page_num, 0) + 1
-        
-        return {
-            'total_formulas': total_formulas,
-            'page_distribution': page_distribution,
-            'pages_with_formulas': len(page_distribution)
-        }
+                logger.error("❌ 已提供 API Key 但未安装 openai，请运行 pip install openai")
+                self.client = None
+        else:
+            self.client = None
 
+    def _pdf_page_to_base64(self, page, zoom=2.0) -> str:
+        """
+        将 PDF 页面转为 Base64 字符串
+        """
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat)
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        img_bytes = buffer.getvalue()
+        return f"data:image/png;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
 
-# 测试代码
-if __name__ == "__main__":
-    from src.utils.logger import setup_logger
-    import sys
-    
-    setup_logger("formula_extractor")
-    
-    print("📊 公式提取器测试")
-    print("="*70)
-    
-    # 检查命令行参数
-    if len(sys.argv) > 1:
-        pdf_path = Path(sys.argv[1])
-        doc_name = pdf_path.stem
-    else:
-        # 默认测试文件
-        pdf_path = Path("data/input/2023CVPR-CoMFormer.pdf")
-        doc_name = "test_formulas"
-    
-    if not pdf_path.exists():
-        print(f"❌ PDF 文件不存在: {pdf_path}")
-        sys.exit(1)
-    
-    # 创建提取器
-    extractor = FormulaExtractor(use_ocr=True)
-    
-    # 提取公式
-    result = extractor.extract_formulas_from_pdf(
-        pdf_path,
-        doc_name=doc_name
-    )
-    
-    print(f"\n✅ 提取结果:")
-    print(f"  公式目录: {result['formula_dir']}")
-    print(f"  总公式数: {result['total_formulas']}")
-    print(f"  成功保存: {result['saved_formulas']}")
-    print(f"  OCR 成功: {result['ocr_success']}")
-    print(f"  OCR 失败: {result['ocr_failed']}")
-    
-    # 保存 LaTeX 代码
-    if result['formula_latex']:
-        latex_file = extractor.save_latex_to_json(
-            result['formula_latex'],
-            doc_name
+    def extract_formulas(self, pdf_path: Path, doc_name: str):
+        """
+        主流程：读取 PDF -> GPT-4o 识别 -> 保存 JSON
+        """
+        if not self.client:
+            raise ValueError("需要配置 api_key 并安装 openai")
+
+        logger.info(f"🚀 开始 GPT-4o 语义提取: {pdf_path}")
+        
+        # 准备输出目录: data/output_json/doc_name/
+        doc_out_dir = self.output_base_dir / doc_name
+        doc_out_dir.mkdir(parents=True, exist_ok=True)
+
+        doc = fitz.open(pdf_path)
+
+        # --- System Prompt 设计 ---
+        # 核心指令：要求区分独立公式和行内公式，并按 JSON 格式返回
+        system_prompt = (
+            "You are an expert mathematical document digitizer. "
+            "Your task is to extract mathematical content from the provided document image. "
+            "Return the result strictly as a JSON object with a single key 'extracted_items'. "
+            "The value of 'extracted_items' must be a list of objects. "
+            "\n\n"
+            "Rules for extraction:\n"
+            "1. **Display Formulas** (equations on their own line): "
+            "   Create an item with {'type': 'display_formula', 'content': '...latex code...'}.\n"
+            "2. **Inline Formulas** (equations embedded in text): "
+            "   Create an item with {'type': 'inline_text', 'content': '...text segment...'}. "
+            "   For inline formulas, DO NOT extract just the math symbol. "
+            "   Instead, extract the whole sentence or text block containing the formula to preserve context. "
+            "   Convert the math parts within that text to LaTeX (e.g., using $...$).\n"
+            "3. Ignore headers, footers, and page numbers.\n"
+            "4. Output strictly valid JSON."
         )
-        print(f"  LaTeX 文件: {latex_file}")
+
+        for i, page in enumerate(doc):
+            page_idx = i + 1
+            # if page_idx > 2: break # 调试用：限制页数
+            
+            logger.info(f"📄 正在处理第 {page_idx} 页...")
+            
+            try:
+                # 1. 转图片
+                img_base64 = self._pdf_page_to_base64(page)
+
+                # 2. 调用 API
+                response = self.client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": "Extract all formulas and relevant text from this page."},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": img_base64,
+                                        "detail": "high" # 高精度模式对于看清小公式至关重要
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    temperature=0.1, # 低温度保证输出格式稳定
+                    response_format={"type": "json_object"} # 强制 JSON
+                )
+
+                content = response.choices[0].message.content
+                
+                # 3. 验证并保存 JSON
+                try:
+                    json_data = json.loads(content)
+                    
+                    # 构造保存路径: page_1.json
+                    json_path = doc_out_dir / f"page_{page_idx}.json"
+                    
+                    # 写入文件（美化格式）
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(json_data, f, ensure_ascii=False, indent=2)
+                        
+                    item_count = len(json_data.get("extracted_items", []))
+                    logger.info(f"✅ 第 {page_idx} 页提取完成，包含 {item_count} 个条目 -> {json_path}")
+                    
+                except json.JSONDecodeError:
+                    logger.error(f"❌ 第 {page_idx} 页 API 返回了非 JSON 格式数据: {content[:100]}...")
+                    # 即使解析失败，也把原始内容存下来以便排查
+                    with open(doc_out_dir / f"page_{page_idx}_error.txt", 'w', encoding='utf-8') as f:
+                        f.write(content)
+
+            except Exception as e:
+                logger.error(f"❌ 第 {page_idx} 页处理异常: {e}")
+        
+        doc.close()
+        logger.info(f"✨ 全部处理完成！结果目录: {doc_out_dir}")
+
+# --- 运行入口 ---
+if __name__ == "__main__":
+    # 使用 response/gpt.py 中的 API Key
     
-    # 统计信息
-    stats = extractor.get_formula_statistics(result['formula_mapping'])
-    print(f"\n📈 统计信息:")
-    print(f"  总公式数: {stats['total_formulas']}")
-    print(f"  包含公式的页数: {stats['pages_with_formulas']}")
-    print(f"  页码分布: {stats['page_distribution']}")
+    # 输入 PDF 路径
+    pdf_file = Path("data/input/2023CVPR-CoMFormer.pdf")
     
-    # 显示部分 LaTeX 示例
-    if result['formula_latex']:
-        print(f"\n📝 LaTeX 示例（前 3 个）:")
-        for i, (name, latex) in enumerate(list(result['formula_latex'].items())[:3]):
-            print(f"  {name}: {latex}")
+    if pdf_file.exists():
+        extractor = GPTFormulaExtractorJSON(api_key=openai_api_key)
+        extractor.extract_formulas(
+            pdf_file,
+            doc_name=pdf_file.stem
+        )
+    else:
+        print(f"文件不存在: {pdf_file}")

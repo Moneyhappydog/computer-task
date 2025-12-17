@@ -1,0 +1,136 @@
+{
+  "extracted_items": [
+    {
+      "type": "inline_text",
+      "content": "classification problem. Instead of predicting a class probability for each pixel, as in previous semantic segmentation works [9, 37], it predicts a set of binary masks, each associated with a single class prediction, effectively addressing both segmentation tasks without any modification in the training architecture and procedure."
+    },
+    {
+      "type": "inline_text",
+      "content": "Differently from previous works [11, 12], however, CoMFormer forces the output binary masks to be mutually exclusive to one another: a pixel can only be predicted as a single binary mask to prevent having several masks classifying the same pixel with different classes."
+    },
+    {
+      "type": "inline_text",
+      "content": "Furthermore, CoMFormer introduces a novel adaptive distillation loss to alleviate forgetting."
+    },
+    {
+      "type": "inline_text",
+      "content": "To reduce the noise, we consider the prediction confidence and we avoid interference with ground-truth annotations."
+    },
+    {
+      "type": "inline_text",
+      "content": "We validate CoMFormer on both continual segmentation tasks. For semantic segmentation, we define a new benchmark relying on the challenging ADE20K where we demonstrate that CoMFormer largely outperforms all previous baselines."
+    },
+    {
+      "type": "inline_text",
+      "content": "On semantic segmentation, we show that CoMFormer outperforms the existing state-of-the-art methods on every setting of the large-scale ADE20K benchmark."
+    },
+    {
+      "type": "inline_text",
+      "content": "To sum up, the contributions of this paper are as follows: We introduce continual panoptic segmentation which has real-world impacts in addition to being significantly more challenging than previous benchmarks."
+    },
+    {
+      "type": "inline_text",
+      "content": "We propose CoMFormer to tackle both continual panoptic and semantic segmentation. To avoid forgetting, we design a novel adaptive distillation and an efficient mask-based pseudo-labeling strategy."
+    },
+    {
+      "type": "inline_text",
+      "content": "Through extensive quantitative and qualitative benchmarks, we showcase the state-of-the-art performance of our model on both continual segmentation tasks."
+    },
+    {
+      "type": "inline_text",
+      "content": "Semantic and Panoptic Segmentation. The two tasks have been traditionally treated separately, with specialized architectures proposed for either one or the other task, without interoperability."
+    },
+    {
+      "type": "inline_text",
+      "content": "Semantic segmentation has been traditionally addressed as a per-pixel classification task."
+    },
+    {
+      "type": "inline_text",
+      "content": "Fully-convolutional network [37] dominated the field by aggregating long-range dependencies in the features map [8, 9, 60] and exploiting contextual information [22, 24, 57, 58, 61]."
+    },
+    {
+      "type": "inline_text",
+      "content": "Recently, transformers [26, 46, 54] are replacing convolutions by integrating long-range dependencies at every layer."
+    },
+    {
+      "type": "inline_text",
+      "content": "Panoptic segmentation [28] has been proposed to unify semantic and instance segmentations."
+    },
+    {
+      "type": "inline_text",
+      "content": "Initially, methods proposed to combine each task-specific architectures [10, 27, 32, 42] or defined new specialized architectures and objective functions for the panoptic task [1, 50, 51], drifting from a general solution for all the segmentation tasks."
+    },
+    {
+      "type": "inline_text",
+      "content": "Recently, methods addressing segmentation as a mask classification problem [11, 12, 50, 56] have been proposed, introducing a transformer architecture able to solve multiple tasks at once."
+    },
+    {
+      "type": "inline_text",
+      "content": "MaskFormer [12] was the first to propose a single architecture to address both panoptic and semantic segmentation."
+    },
+    {
+      "type": "inline_text",
+      "content": "Mask2Former [11] improves it by adopting multi-scale features, masked attention and optimization tricks."
+    },
+    {
+      "type": "inline_text",
+      "content": "Concurrently, kMaX-DeepLab [56] extended it by proposing to reformulate the cross-attention as a clustering process."
+    },
+    {
+      "type": "inline_text",
+      "content": "Despite their effectiveness in standard training settings, these methods suffer from catastrophic forgetting."
+    },
+    {
+      "type": "inline_text",
+      "content": "In this work, we aim to extend their capability and we propose CoMFormer to learn to segment new classes over time."
+    },
+    {
+      "type": "inline_text",
+      "content": "Continual Segmentation. Continual learning is a longstanding field addressing the problem of learning new knowledge over time while avoiding catastrophic forgetting [21, 44, 47]."
+    },
+    {
+      "type": "inline_text",
+      "content": "Traditionally, it has been studied in the context of image classification [6, 17, 29, 33, 43, 45, 55] but there is a growing interest in its applications in segmentation [2, 5, 15, 16, 38–40, 59]."
+    },
+    {
+      "type": "inline_text",
+      "content": "Continual semantic segmentation introduces additional challenges, as pointed out by [4]."
+    },
+    {
+      "type": "inline_text",
+      "content": "In particular, considering the task as a per-pixel classification problem, catastrophic forgetting is exacerbated by the background shift, where old classes pixels are treated as background in following training steps."
+    },
+    {
+      "type": "inline_text",
+      "content": "[4] proposed a revision of the standard knowledge distillation framework to deal with it."
+    },
+    {
+      "type": "inline_text",
+      "content": "[17, 39] introduced a distillation loss preserving the representation at feature level while [38] proposed an approach using old classes’ examples to alleviate forgetting."
+    },
+    {
+      "type": "inline_text",
+      "content": "Recently, [59] presented a technique that decouples learning the representation of the new classes while freezing the representation for the old ones."
+    },
+    {
+      "type": "inline_text",
+      "content": "Differently from previous work, we extend the benchmarks to solve both semantic and the more challenging panoptic segmentation task."
+    },
+    {
+      "type": "inline_text",
+      "content": "Continual Learning with Transformers. Recent progresses made using transformers for computer vision [14, 36, 48, 49] attracted the attention of the continual learning community [19, 52, 53]."
+    },
+    {
+      "type": "inline_text",
+      "content": "In particular, DyTox [19] proposed to specialize the architecture on each task using a different task-specific token."
+    },
+    {
+      "type": "inline_text",
+      "content": "Learning-to-Prompt [53] stores a pool of prompts that are employed to condition the whole forward execution of the patch tokens."
+    },
+    {
+      "type": "inline_text",
+      "content": "To the best of our knowledge, transformers have been evaluated only in continual learning for image classification [19, 31] and we are the first to use them in the continual segmentation task."
+    }
+  ]
+}

@@ -16,6 +16,9 @@ __pycache__/
 .env
 .env.local
 
+# API 密钥配置（敏感信息）
+response/
+
 # IDE
 .vscode/
 .idea/

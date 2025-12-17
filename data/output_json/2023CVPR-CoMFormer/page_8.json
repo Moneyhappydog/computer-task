@@ -1,0 +1,80 @@
+{
+  "extracted_items": [
+    {
+      "type": "display_formula",
+      "content": "mIoU"
+    },
+    {
+      "type": "display_formula",
+      "content": "PQ"
+    },
+    {
+      "type": "inline_text",
+      "content": "In Tab. 3, we compare the proposed CoMFormer against Mask2Former [11]. In particular, to fairly compare the two methods, we add our adaptive distillation loss and the pseudo-labeling strategy to Mask2Former."
+    },
+    {
+      "type": "inline_text",
+      "content": "On panoptic segmentation, CoMFormer exceeds Mask2Former in all the classes with a considerable gap (6 PQ on both old and new classes on average)."
+    },
+    {
+      "type": "inline_text",
+      "content": "We conclude that a vanilla MaskFormer architecture is not suited to continual learning because it suffers from forgetting, while CoMFormer outperforms it in any setting."
+    },
+    {
+      "type": "inline_text",
+      "content": "In Tab. 4, reporting the results in PQ on the 100-50 and 100-10 settings in panoptic segmentation."
+    },
+    {
+      "type": "inline_text",
+      "content": "Without applying any regularization technique, the performance on old classes drops to 0, denoting that it is important to deal with forgetting."
+    },
+    {
+      "type": "inline_text",
+      "content": "Both the adaptive distillation loss (AD) and the pseudo-labeling strategy (PS) lead to improvement in the old classes when applied independently."
+    },
+    {
+      "type": "inline_text",
+      "content": "However, we obtain the best results when combining them, especially considering the 100-10 scenario, where the old classes are improved by 5.8 PQ and the final performances of 3.9 PQ."
+    },
+    {
+      "type": "inline_text",
+      "content": "Finally, the table shows that weighting the queries based on their semantic content is essential to improve performance: comparing a standard distillation (KD Eq. (1)) with our adaptive distillation (AD Eq. (3)), we largely improve the performance on both settings: +3.9 PQ in 100-50 and +3.7 PQ in 100-10 considering all classes."
+    },
+    {
+      "type": "inline_text",
+      "content": "Forgetting in CoMFormer. To investigate the reason for the forgetting, we considered separately the Recognition Quality (RQ) and the Segmentation Quality (SQ) in panoptic segmentation."
+    },
+    {
+      "type": "inline_text",
+      "content": "RQ measures how well the model is able to classify segments, while SQ considers the precision of the segmentation."
+    },
+    {
+      "type": "inline_text",
+      "content": "Note that, as reported in [28], SQ and RQ are not independent since SQ is computed only on segments correctly classified."
+    },
+    {
+      "type": "inline_text",
+      "content": "The results on the 100-50 and 100-10 are reported in Tab. 5."
+    },
+    {
+      "type": "inline_text",
+      "content": "The table clearly shows that, when forgetting occurs, it impacts negatively on the classification ability while it is less marked on the segmentation ability of the model."
+    },
+    {
+      "type": "inline_text",
+      "content": "CoMFormer, in fact, without providing regularization losses on the mask prediction, is able to match the segmentation ability of the joint upper bound on the 100-50 and it gets close results on the 100-10 (-5.6)."
+    },
+    {
+      "type": "inline_text",
+      "content": "In addition, it is evident that classification ability is heavily affected by forgetting."
+    },
+    {
+      "type": "inline_text",
+      "content": "CoMFormer has a gap with Joint of 3.2 and 11.4 RQ respectively in the 100-50 and 100-10."
+    },
+    {
+      "type": "inline_text",
+      "content": "We note that, however, other baselines are more affected by forgetting, showcasing even larger gaps."
+    }
+  ]
+}

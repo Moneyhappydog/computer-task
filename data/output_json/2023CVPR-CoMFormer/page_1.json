@@ -1,0 +1,48 @@
+{
+  "extracted_items": [
+    {
+      "type": "inline_text",
+      "content": "Inspired by recent transformer approaches that consider segmentation as a mask-classification problem, we design CoMFormer."
+    },
+    {
+      "type": "inline_text",
+      "content": "Our method carefully exploits the properties of transformer architectures to learn new classes over time."
+    },
+    {
+      "type": "inline_text",
+      "content": "Specifically, we propose a novel adaptive distillation loss along with a mask-based pseudo-labeling technique to effectively prevent forgetting."
+    },
+    {
+      "type": "inline_text",
+      "content": "To evaluate our approach, we introduce a novel panoptic segmentation benchmark on the challenging ADE20K dataset."
+    },
+    {
+      "type": "inline_text",
+      "content": "CoMFormer outperforms all the existing baselines by forgetting less old classes but also learning more effectively new classes."
+    },
+    {
+      "type": "inline_text",
+      "content": "In addition, we also report an extensive evaluation in the large-scale continual semantic segmentation scenario showing that CoMFormer also significantly outperforms state-of-the-art methods."
+    },
+    {
+      "type": "inline_text",
+      "content": "The problem of updating the knowledge of the model over time is typically referred as continual learning."
+    },
+    {
+      "type": "inline_text",
+      "content": "It has been traditionally studied in the context of image classification [17, 19, 29, 33, 43, 45] and is gaining attention on the segmentation task [3, 4, 15, 39, 59] due to the more realistic applications and the additional challenges it introduces, such as the background shift [4]."
+    },
+    {
+      "type": "inline_text",
+      "content": "However, current state-of-the-art methods mainly focus on semantic segmentation and are not designed to work in other segmentation tasks, strongly limiting their application in the real world."
+    },
+    {
+      "type": "inline_text",
+      "content": "In this paper, we design the first method operating in both continual semantic and panoptic segmentation, as illustrated in Fig. 1."
+    },
+    {
+      "type": "inline_text",
+      "content": "Our method, CoMFormer (Continual MaskFormer), takes inspiration from recent transformer architectures [11, 12], approaching segmentation as a mask classification."
+    }
+  ]
+}

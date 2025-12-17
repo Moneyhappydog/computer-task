@@ -1,0 +1,48 @@
+{
+  "extracted_items": [
+    {
+      "type": "inline_text",
+      "content": "To learn the new classes, simple solutions is to fine-tune the model on the new dataset. However, because it lacks annotations for old classes, this operation results in catastrophic forgetting [21]."
+    },
+    {
+      "type": "inline_text",
+      "content": "An adaptation of standard knowledge distillation works [4] would force the new model to mimic the old model probabilities over all the N outputs, independently from their content."
+    },
+    {
+      "type": "display_formula",
+      "content": "L_{KD} = \\frac{1}{N} \\sum_{i=1}^{N} \\sum_{k=1}^{K^{t-1}+1} p_i^o(k) \\log \\frac{\\tilde{p}_i(k)}{p_i^o(k)}"
+    },
+    {
+      "type": "inline_text",
+      "content": "where \\( K^{t-1} + 1 \\) is the \\( \\varnothing \\) class and \\( \\tilde{p}_i(k) \\) represents the unbiased probability distribution of i-th output for class k:"
+    },
+    {
+      "type": "display_formula",
+      "content": "\\tilde{p}_i(k) = \\begin{cases} \\frac{\\sum_{j \\in \\mathcal{X}_k} p_i(j) + p_i(\\varnothing)}{p_i(k)} & \\text{if } k = \\varnothing, \\\\ p_i(k) & \\text{otherwise.} \\end{cases}"
+    },
+    {
+      "type": "inline_text",
+      "content": "Note that, similarly to [4], it forces the sum of the model new class (\\( K^t \\)) and the “no object” class (\\( \\varnothing \\)) probabilities to be similar to the old model \\( p^o \\) probability."
+    },
+    {
+      "type": "inline_text",
+      "content": "However, not every output probability brings relevant information: most of them are predicted as “no object” (\\( \\varnothing \\)) and thus they do not carry enough details to remember the old classes while reducing the relative importance of the other outputs probabilities."
+    },
+    {
+      "type": "inline_text",
+      "content": "For this reason, we re-weight their contribution based on the probability of not being \\( \\varnothing \\)."
+    },
+    {
+      "type": "display_formula",
+      "content": "L_{AD}(p, p^o) = -\\frac{1}{N} \\sum_{i=1}^{N} \\frac{\\omega_i}{\\sum_{i=1}^{N} \\omega_i} \\sum_{k=1}^{K^{t-1}+1} p_i^o(k) \\log \\frac{\\tilde{p}_i(k)}{p_i^o(k)}"
+    },
+    {
+      "type": "inline_text",
+      "content": "where the weighting coefficient is \\( \\omega_i = (1 - p_i^o(\\varnothing))^2 \\)."
+    },
+    {
+      "type": "inline_text",
+      "content": "Note that, with this formulation, we effectively reduce the contributions of outputs that bring small information about the old classes (\\( p_i^o(\\varnothing) \\approx 1 \\)), while we increase the contribution of important ones."
+    }
+  ]
+}

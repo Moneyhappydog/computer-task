@@ -1,0 +1,68 @@
+{
+  "extracted_items": [
+    {
+      "type": "inline_text",
+      "content": "On both old (+10.4 and +6.3 PQ) and new classes (+9.4 and +0.2 PQ)."
+    },
+    {
+      "type": "inline_text",
+      "content": "Finally, we note that CoMFormer obtains performance close to the Joint baseline in the 100-50 setting, suffering a drop of only 2.1 PQ on the old classes and 4.4 PQ on the new ones."
+    },
+    {
+      "type": "inline_text",
+      "content": "In the other settings, the gap is still relevant, indicating that learning from multiple training steps is still a very challenging task."
+    },
+    {
+      "type": "inline_text",
+      "content": "In Fig. 7, we report a qualitative comparison with the baselines in the 100-10 setting using randomly chosen images."
+    },
+    {
+      "type": "inline_text",
+      "content": "We can see that our method is able to maintain better the previous knowledge by precisely segmenting all the classes in the image; for example, w.r.t. to PLOP, our method correctly segments the chair in the second row and the boat in the third row."
+    },
+    {
+      "type": "inline_text",
+      "content": "We can note a common error: models correctly segment but misclassify objects in the image, like the plane classified as car in the first row or the press classified as door in the third row."
+    },
+    {
+      "type": "inline_text",
+      "content": "We report the comparison with state-of-the-art methods in continual semantic segmentation in Tab. 2."
+    },
+    {
+      "type": "inline_text",
+      "content": "CoMFormer achieves the best results on every setting, surpassing both methods based on DeepLab-v3 [9] and baselines implemented upon the same architecture."
+    },
+    {
+      "type": "inline_text",
+      "content": "In particular, we can see that CoMFormer outperforms the best state-of-the-art method (RCIL [59]) by 3.9% on the 100-50, by 0.2% on 100-10, and by 1.3% on the 100-5."
+    },
+    {
+      "type": "inline_text",
+      "content": "Moreover, note that we always improve the performance on the old classes and the avg across different learning steps."
+    },
+    {
+      "type": "inline_text",
+      "content": "In addition, CoMFormer exceeds all the implemented baselines."
+    },
+    {
+      "type": "inline_text",
+      "content": "Comparing CoMFormer with PLOP (Mask-based), we can see that it obtains a substantial performance improvement, especially considering scenarios with longer training protocols: CoMFormer achieves 30.9% (32.3%) on the all metrics, while PLOP only 27.1% (28.5%) on the 100-5 (100-10) setting."
+    },
+    {
+      "type": "inline_text",
+      "content": "Furthermore, the results confirm that improvements are not led by the newer architecture."
+    },
+    {
+      "type": "inline_text",
+      "content": "Per-Pixel baselines achieve only similar or even lower performance than their counterparts."
+    },
+    {
+      "type": "inline_text",
+      "content": "MiB (Per-Pixel), for example, slightly improves the one based on DeepLab-v3 on the 100-50 (+2.0% on all) and in the 100-5 (+1.3%) but its performance is slightly worse in the 100-10 (-1.1%)."
+    },
+    {
+      "type": "inline_text",
+      "content": "In addition, note that Per-Pixel baselines demonstrate a large performance drop in the old classes w.r.t. their counterpart, showing that, without employing a distillation strategy tailored to the architecture, it is difficult to maintain satisfactory results."
+    }
+  ]
+}
