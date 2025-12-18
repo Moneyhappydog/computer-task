@@ -48,7 +48,8 @@ class TableExtractor:
         # 2. 初始化 OpenAI (用于过滤非表格图片)
         self.client = None
         if api_key and API_DEPS_AVAILABLE:
-            self.client = OpenAI(api_key=api_key)
+            # 强制指定 base_url 为 OpenAI 官方地址
+            self.client = OpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
             logger.info("✅ OpenAI Client 已加载 (将启用智能过滤功能)")
         else:
             logger.warning("⚠️ 未提供 API Key 或未安装 openai，将跳过智能过滤 (可能会误检流程图)")

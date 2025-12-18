@@ -1,0 +1,88 @@
+{
+  "extracted_items": [
+    {
+      "type": "inline_text",
+      "content": "Continual learning for segmentation has recently seen increasing interest. However, all previous works focus on narrow semantic segmentation and disregard panoptic segmentation, an important task with real-world impacts."
+    },
+    {
+      "type": "inline_text",
+      "content": "In this paper, we present the first continual learning model capable of operating on both semantic and panoptic segmentation."
+    },
+    {
+      "type": "inline_text",
+      "content": "Inspired by recent transformer approaches that consider segmentation as a mask-classification problem, we design CoMFormer."
+    },
+    {
+      "type": "inline_text",
+      "content": "Our method carefully exploits the properties of transformer architectures to learn new classes over time."
+    },
+    {
+      "type": "inline_text",
+      "content": "Specifically, we propose a novel adaptive distillation loss along with a mask-based pseudo-labeling technique to effectively prevent forgetting."
+    },
+    {
+      "type": "inline_text",
+      "content": "To evaluate our approach, we introduce a novel continual panoptic segmentation benchmark on the challenging ADE20K dataset."
+    },
+    {
+      "type": "inline_text",
+      "content": "Our CoMFormer outperforms all the existing baselines by forgetting less old classes but also learning more effectively new classes."
+    },
+    {
+      "type": "inline_text",
+      "content": "In addition, we also report an extensive evaluation in the large-scale continual semantic segmentation scenario showing that CoMFormer also significantly outperforms state-of-the-art methods."
+    },
+    {
+      "type": "inline_text",
+      "content": "Image segmentation is a fundamental computer vision problem that enables machines to assign an image’s pixels to discrete segments."
+    },
+    {
+      "type": "inline_text",
+      "content": "Semantic segmentation clusters pixels by classes, merging in a single segment pixels belonging to instances of the same class."
+    },
+    {
+      "type": "inline_text",
+      "content": "Panoptic segmentation assigns to every pixel a semantic class while separating different instances into different segments."
+    },
+    {
+      "type": "inline_text",
+      "content": "This latter kind of segmentation has real-world impacts in autonomous robots and vehicles."
+    },
+    {
+      "type": "inline_text",
+      "content": "Despite tremendous progress in image segmentation, the current approaches are trained on a static dataset with a predefined set of classes."
+    },
+    {
+      "type": "inline_text",
+      "content": "Whenever an update of the model is required to fit new classes, the common solution is to train a model from scratch on the union of the old and new class data."
+    },
+    {
+      "type": "inline_text",
+      "content": "A computationally more efficient solution would be to fine-tune the existing model solely on the new class data."
+    },
+    {
+      "type": "inline_text",
+      "content": "Unfortunately, this approach would cause a catastrophic forgetting of the old classes on which the model performance would be extremely degraded."
+    },
+    {
+      "type": "inline_text",
+      "content": "The problem of updating the knowledge of the model over time is typically referred as continual learning."
+    },
+    {
+      "type": "inline_text",
+      "content": "It has been traditionally studied in the context of image classification and is gaining attention on the segmentation task due to the more realistic applications and the additional challenges it introduces, such as the background shift."
+    },
+    {
+      "type": "inline_text",
+      "content": "However, current state-of-the-art methods mainly focus on semantic segmentation and are not designed to work on their segmentation tasks, strongly limiting their application in the real world."
+    },
+    {
+      "type": "inline_text",
+      "content": "In this paper, we design the first method operating in both continual semantic and panoptic segmentation, as illustrated in Fig. 1."
+    },
+    {
+      "type": "inline_text",
+      "content": "Our method, CoMFormer (Continual MaskFormer), takes inspiration from recent transformer architectures, approaching segmentation as a mask classification."
+    }
+  ]
+}

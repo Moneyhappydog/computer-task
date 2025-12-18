@@ -39,8 +39,10 @@ class GPTFormulaExtractorJSON:
         
         if api_key:
             if API_DEPS_AVAILABLE:
-                self.client = OpenAI(api_key=api_key)
-                logger.info("✅ [API] OpenAI Client 已初始化")
+                # 强制指定 base_url 为 OpenAI 官方地址
+                # 防止因 utils.config 加载 .env (其中可能包含 Aliyun 的 BASE_URL) 导致的环境变量污染
+                self.client = OpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
+                logger.info("✅ [API] OpenAI Client 已初始化 (Base URL: https://api.openai.com/v1)")
             else:
                 logger.error("❌ 已提供 API Key 但未安装 openai，请运行 pip install openai")
                 self.client = None

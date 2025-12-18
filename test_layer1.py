@@ -49,7 +49,23 @@ def test_pdf_processor(pdf_path: Path) -> bool:
     
     # 测试1: 使用marker提取（启用OCR）
     print("\n1️⃣  测试Marker提取（深度学习方案，启用OCR）...")
-    processor_marker = PDFProcessor(use_marker=True, use_ocr=True)
+    
+    # 尝试获取 API Key
+    try:
+        from response.gpt import openai_api_key
+        api_key = openai_api_key
+        print(f"🔑 已加载 API Key: {api_key[:8]}...")
+    except ImportError:
+        api_key = None
+        print("⚠️ 未找到 API Key，公式提取和表格智能过滤将不可用")
+
+    processor_marker = PDFProcessor(
+        use_marker=True, 
+        use_ocr=True,
+        use_table=True,
+        use_formula=True,
+        api_key=api_key
+    )
     result_marker = processor_marker.process(pdf_path)
     
     if result_marker['success']:
