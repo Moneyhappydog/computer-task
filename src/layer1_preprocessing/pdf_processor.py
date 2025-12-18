@@ -20,7 +20,6 @@ from utils.logger import setup_logger
 from utils.config import Config
 from .ocr_processor import OCRProcessor
 from .image_extractor import ImageExtractor
-from .chart_detector import ChartDetector
 from .formula_extractor import GPTFormulaExtractorJSON
 from .table_extractor import TableExtractor
 import concurrent.futures

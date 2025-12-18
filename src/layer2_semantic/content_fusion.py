@@ -188,15 +188,17 @@ class ContentFusionProcessor:
             "   Replace any garbled math text in the Markdown with the correct LaTeX from the JSON. "
             "   Ensure inline formulas use $...$ and display formulas use $$...$$.\n"
             "3. **Table Integration**: The provided images are tables found on this page. "
-            "   - ONLY replace **existing text-based representations** of tables (often broken or messy) with the provided image links.\n"
-            "   - Do **NOT** insert a table image if there is no corresponding text table or placeholder in the markdown. Do NOT hallucinate tables.\n"
-            "   - Format: `![filename](path/to/table.png)`. Use the filename as the alt text (e.g., `![p1_table_0.png](...)`).\n"
+            "   - Identify any text-based tables (or messy text that looks like a table) in the Markdown.\n"
+            "   - **REPLACE** them completely with the corresponding table image link provided.\n"
+            "   - **CRITICAL**: You MUST DELETE the original text-based table content. Do NOT keep both the text table and the image.\n"
+            "   - Format: `![filename](path/to/table.png)`. Use the filename as the alt text.\n"
             "   - IMPORTANT: Use the relative path provided in the user prompt for the image.\n"
+            "   - If you cannot find a corresponding text table for an image, do NOT insert the image.\n"
             "4. **Figure Context & Preservation**: \n"
             "   - I have provided the figures (images) that appear on this page for context.\n"
             "   - **STRICTLY FORBIDDEN**: Do NOT move, reorder, or remove existing image links (figures). Keep them exactly where they are in the text flow.\n"
             "   - You may correct the text around them (captions, references) but do not touch the image link itself.\n"
-            "5. **Output**: Return ONLY the refined Markdown text. Do not include 'Here is the refined text' or markdown code blocks."
+            "5. **Output**: Return ONLY the refined Markdown text. Do not include 'Here is the refined text', '### Page X Refined Markdown', or markdown code blocks. Start directly with the content."
         )
         
         # 构造用户消息
@@ -255,7 +257,18 @@ class ContentFusionProcessor:
                 ],
                 temperature=0.1
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            
+            # 后处理：清理可能存在的 Markdown 代码块标记
+            if content.strip().startswith("```"):
+                content = re.sub(r'^```(?:markdown)?\s*', '', content.strip())
+                content = re.sub(r'\s*```$', '', content)
+
+            # 后处理：清理 "### Page X Refined Markdown" 等类似标题
+            # 匹配开头可能是 #, ##, ###, ** 等，包含 Page, Refined 等关键词的行
+            content = re.sub(r'^(?:#+|\*\*)\s*Page\s+\d+.*?(?:Refined|Markdown).*?\n+', '', content, flags=re.IGNORECASE).strip()
+            
+            return content
         except Exception as e:
             logger.error(f"❌ 第 {page_num} 页融合失败: {e}")
             return text # 失败则返回原文
