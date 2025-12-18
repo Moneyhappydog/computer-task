@@ -7,6 +7,11 @@ from typing import List, Dict, Optional, Any
 # import pdfplumber
 from pdf2image import convert_from_path
 import os
+import base64
+import json
+import re
+import difflib
+from io import BytesIO
 
 # 导入工具模块
 import sys
@@ -19,6 +24,11 @@ from .chart_detector import ChartDetector
 from .formula_extractor import GPTFormulaExtractorJSON
 from .table_extractor import TableExtractor
 import concurrent.futures
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 logger = setup_logger(__name__)
 
@@ -89,6 +99,14 @@ class PDFProcessor:
                 logger.warning(f"公式提取器初始化失败: {e}")
                 self.use_formula = False
         
+        # 初始化 OpenAI Client (用于分页修复)
+        self.client = None
+        if self.api_key and OpenAI:
+            try:
+                self.client = OpenAI(api_key=self.api_key, base_url="https://api.openai.com/v1")
+            except Exception as e:
+                logger.warning(f"OpenAI Client 初始化失败: {e}")
+
         # 5. 初始化Marker模型 (最后加载，占用最大显存)
         if self.use_marker:
             try:
@@ -233,6 +251,18 @@ class PDFProcessor:
             pages = []
             page_texts = full_text.split("\n---\n")  # Marker用---分隔页面
             
+            # 如果Marker未能正确分页，尝试使用AI修复
+            if len(page_texts) == 1 and self.client:
+                logger.warning("⚠️ Marker未能检测到分页符，尝试使用AI进行分页修复...")
+                try:
+                    fixed_text = self._fix_pagination_with_ai(full_text, pdf_path)
+                    if fixed_text != full_text:
+                        full_text = fixed_text
+                        page_texts = full_text.split("\n---\n")
+                        logger.success(f"✅ AI分页修复成功，检测到 {len(page_texts)} 页")
+                except Exception as e:
+                    logger.error(f"❌ AI分页修复失败: {e}")
+
             for i, page_text in enumerate(page_texts, 1):
                 pages.append({
                     "page": i,
@@ -424,6 +454,156 @@ class PDFProcessor:
                 'error': str(e)
             }
     
+    def _find_split_point(self, text: str, anchor_text: str) -> int:
+        """
+        在文本中寻找切分点（支持模糊匹配）
+        返回切分点的索引，如果未找到返回-1
+        """
+        if not anchor_text or not text:
+            return -1
+            
+        # 1. 尝试精确匹配
+        idx = text.find(anchor_text)
+        if idx != -1:
+            return idx + len(anchor_text)
+            
+        # 2. 尝试忽略空白字符的匹配
+        # 构建字符到原始索引的映射
+        text_chars = []
+        text_indices = []
+        for i, char in enumerate(text):
+            if not char.isspace():
+                text_chars.append(char)
+                text_indices.append(i)
+        
+        clean_text = "".join(text_chars)
+        clean_anchor = "".join(c for c in anchor_text if not c.isspace())
+        
+        if not clean_anchor:
+            return -1
+
+        # 在清洗后的文本中查找
+        clean_idx = clean_text.find(clean_anchor)
+        if clean_idx != -1:
+            # 找到匹配结束位置在clean_text中的索引
+            clean_end = clean_idx + len(clean_anchor)
+            # 映射回原始文本的索引
+            if clean_end > 0 and clean_end <= len(text_indices):
+                return text_indices[clean_end - 1] + 1
+        
+        # 3. 如果还是找不到，尝试只匹配锚点文本的后半部分（容错）
+        if len(clean_anchor) > 20:
+            partial_anchor = clean_anchor[len(clean_anchor)//2:]
+            clean_idx = clean_text.find(partial_anchor)
+            if clean_idx != -1:
+                clean_end = clean_idx + len(partial_anchor)
+                if clean_end > 0 and clean_end <= len(text_indices):
+                    return text_indices[clean_end - 1] + 1
+
+        # 4. 最后的手段：使用difflib在一定范围内寻找最佳匹配
+        # 为了性能，我们只在文本的前10000个字符中搜索（假设分页点不会偏离太远）
+        search_window_size = 10000 
+        search_text = clean_text[:search_window_size]
+        
+        s = difflib.SequenceMatcher(None, search_text, clean_anchor)
+        match = s.find_longest_match(0, len(search_text), 0, len(clean_anchor))
+        
+        # 如果找到了足够长的匹配（例如匹配了锚点的60%以上）
+        if match.size > len(clean_anchor) * 0.6:
+             clean_end = match.a + match.size
+             if clean_end > 0 and clean_end <= len(text_indices):
+                return text_indices[clean_end - 1] + 1
+                    
+        return -1
+
+    def _fix_pagination_with_ai(self, text: str, pdf_path: Path) -> str:
+        """
+        使用AI根据PDF页面图像修复Markdown的分页
+        """
+        logger.info("🔄 正在生成PDF页面快照以辅助分页...")
+        try:
+            # 1. 将PDF转换为图片 (低分辨率即可，主要看文字布局)
+            images = convert_from_path(str(pdf_path), dpi=72)
+            
+            # 2. 构造Prompt
+            # 为了节省Token，我们不发送整个文本，而是请求AI找出每一页的"最后一句独特文本"
+            # 然后我们在本地进行切分
+            
+            user_content = [
+                {"type": "text", "text": "I have a long Markdown text extracted from this PDF, but it lost page breaks. "
+                                         "I need to split it back into pages.\n"
+                                         "Please look at each PDF page image provided below, and identify the **last unique sentence or phrase** (10-20 words) that appears at the very bottom of that page's main text body (ignore footers/page numbers if possible, unless they are the only anchor).\n"
+                                         "Return a JSON list: `[{\"page\": 1, \"last_text\": \"...\"}, {\"page\": 2, \"last_text\": \"...\"}, ...]`\n"
+                                         "Ensure the text you quote exists exactly in the document."}
+            ]
+            
+            # 添加图片 (限制数量以防超限，假设前20页)
+            max_pages = 20
+            if len(images) > max_pages:
+                logger.warning(f"文档过长 ({len(images)}页)，仅处理前 {max_pages} 页的分页修复")
+                images = images[:max_pages]
+                
+            for i, img in enumerate(images):
+                # 转base64
+                buffered = BytesIO()
+                img.save(buffered, format="JPEG", quality=70)
+                img_str = base64.b64encode(buffered.getvalue()).decode()
+                
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img_str}"}
+                })
+                user_content.append({"type": "text", "text": f"Page {i+1}"})
+
+            # 3. 调用API
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that helps recover document structure. Return only JSON."},
+                    {"role": "user", "content": user_content}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.0
+            )
+            
+            result = json.loads(response.choices[0].message.content)
+            anchors = result.get("pages", [])
+            if not anchors and isinstance(result, list): # 兼容直接返回列表的情况
+                anchors = result
+                
+            # 4. 应用切分
+            # 这是一个简单的贪婪匹配
+            current_text = text
+            final_parts = []
+            
+            for anchor in anchors:
+                last_text = anchor.get("last_text", "").strip()
+                if not last_text: continue
+                
+                # 使用增强的查找方法
+                split_point_relative = self._find_split_point(current_text, last_text)
+                
+                if split_point_relative != -1:
+                    # 找到切分点
+                    page_content = current_text[:split_point_relative]
+                    final_parts.append(page_content)
+                    current_text = current_text[split_point_relative:]
+                    logger.debug(f"✅ 第 {anchor['page']} 页切分成功，锚点: '{last_text[:20]}...'")
+                else:
+                    logger.warning(f"⚠️ 无法在文本中找到第 {anchor['page']} 页的锚点文本: '{last_text}'")
+                    logger.warning(f"   当前文本开头(前100字符): {current_text[:100].replace(chr(10), ' ')}")
+                    # 如果找不到，可能需要跳过或保留在下一页
+            
+            # 添加剩余部分
+            if current_text.strip():
+                final_parts.append(current_text)
+                
+            return "\n\n---\n\n".join(final_parts)
+
+        except Exception as e:
+            logger.error(f"AI分页修复过程出错: {e}")
+            return text # 返回原文本
+
     def _extract_with_ocr(self, pdf_path: Path) -> Dict:
         """
         使用OCR进行文本提取（扫描件方案）

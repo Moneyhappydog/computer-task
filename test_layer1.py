@@ -99,6 +99,14 @@ def test_pdf_processor(pdf_path: Path) -> bool:
         print("=" * 70)
         print(result_marker['markdown'][:1000])
         print("=" * 70)
+        
+        # 检查分页符
+        page_breaks = result_marker['markdown'].count("\n---\n")
+        if page_breaks > 0:
+            print(f"\n✅ 检测到 {page_breaks} 个分页符 (---)")
+        else:
+            print(f"\n⚠️ 未检测到分页符! (这可能意味着分页修复失败或文档只有一页)")
+            
     else:
         print(f"⚠️  Marker提取失败: {result_marker.get('error')}")
     
