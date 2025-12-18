@@ -16,31 +16,44 @@ from utils.config import Config
 from .ocr_processor import OCRProcessor
 from .image_extractor import ImageExtractor
 from .chart_detector import ChartDetector
+from .formula_extractor import GPTFormulaExtractorJSON
+from .table_extractor import TableExtractor
+import concurrent.futures
 
 logger = setup_logger(__name__)
 
 class PDFProcessor:
-    """PDF智能处理器（优先使用marker-pdf）"""
+    """PDF智能处理器（集成Marker、OCR、表格提取、公式提取）"""
     
-    def __init__(self, use_marker: bool = True, use_ocr: bool = True):
+    def __init__(self, use_marker: bool = True, use_ocr: bool = True, 
+                 use_table: bool = True, use_formula: bool = True, api_key: str = None):
         """
         初始化PDF处理器
         
         Args:
             use_marker: 是否尝试使用marker-pdf（深度学习方案）
             use_ocr: 是否在需要时自动使用OCR
+            use_table: 是否启用专门的表格提取
+            use_formula: 是否启用专门的公式提取
+            api_key: OpenAI API Key (用于表格和公式提取)
         """
         self.use_marker = use_marker
         self.use_ocr = use_ocr
+        self.use_table = use_table
+        self.use_formula = use_formula
+        self.api_key = api_key
+        
         self.marker_models = None
         self.ocr_processor = None
+        self.table_extractor = None
+        self.formula_extractor = None
         
         # 设置环境变量以优化内存使用
         os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
         os.environ['OMP_NUM_THREADS'] = '1'
         os.environ['MKL_NUM_THREADS'] = '1'
         
-        # 初始化OCR处理器
+        # 1. 初始化OCR处理器
         if use_ocr:
             try:
                 self.ocr_processor = OCRProcessor()
@@ -49,14 +62,34 @@ class PDFProcessor:
                 logger.warning(f"OCR处理器初始化失败，将不使用OCR: {e}")
                 self.use_ocr = False
         
-        # 初始化图表检测器（默认启用）
+        # 2. 初始化图表检测器（默认启用）
         try:
             self.chart_detector = ChartDetector()
             logger.success("✓ 图表检测器初始化成功")
         except Exception as e:
             logger.warning(f"图表检测器初始化失败: {e}")
             self.chart_detector = None
+            
+        # 3. 初始化表格提取器
+        if self.use_table:
+            try:
+                # 注意：TableExtractor会加载模型，占用显存
+                self.table_extractor = TableExtractor(api_key=self.api_key)
+                logger.success("✓ 表格提取器初始化成功")
+            except Exception as e:
+                logger.warning(f"表格提取器初始化失败: {e}")
+                self.use_table = False
+
+        # 4. 初始化公式提取器 (API轻量级)
+        if self.use_formula:
+            try:
+                self.formula_extractor = GPTFormulaExtractorJSON(api_key=self.api_key)
+                logger.success("✓ 公式提取器初始化成功")
+            except Exception as e:
+                logger.warning(f"公式提取器初始化失败: {e}")
+                self.use_formula = False
         
+        # 5. 初始化Marker模型 (最后加载，占用最大显存)
         if self.use_marker:
             try:
                 logger.info("正在加载Marker模型（首次运行会自动下载）...")
@@ -269,7 +302,7 @@ class PDFProcessor:
     
     def process(self, file_path: Path) -> Dict[str, Any]:
         """
-        处理PDF文件（统一接口）
+        处理PDF文件（并行执行多模态提取）
         
         Args:
             file_path: PDF文件路径
@@ -278,51 +311,104 @@ class PDFProcessor:
             包含markdown内容和元数据的字典
         """
         try:
-            # 提取文本（extract_text 内部已经调用了 fix_markdown_image_paths）
-            result = self.extract_text(file_path)
-            markdown_text = result.get('text', '')
-            
-            # 清理图表OCR乱码（优先处理）
-            if self.chart_detector and result.get('image_mapping'):
-                try:
-                    logger.info("开始清理图表OCR乱码...")
-                    markdown_text = self.chart_detector.clean_markdown(
-                        markdown_text,
-                        result.get('image_mapping', {})
-                    )
-                except Exception as e:
-                    logger.warning(f"图表乱码清理失败: {e}")
-            
-            # 保存输出到 data/output/{doc_name}/layer1/
-            from utils.config import Config
-            import re
             doc_name = file_path.stem
+            from utils.config import Config
             output_dir = Path(Config.OUTPUT_DIR) / doc_name / "layer1"
             output_dir.mkdir(parents=True, exist_ok=True)
             
+            logger.info(f"🚀 开始多模态处理流程: {doc_name}")
+            
+            # 定义任务结果容器
+            text_result = None
+            formula_future = None
+            table_result = []
+            
+            # 使用线程池并行运行 API 密集型任务 (公式提取)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                
+                # 1. 提交公式提取任务 (IO密集型，适合并行)
+                if self.use_formula and self.formula_extractor:
+                    logger.info("📤 提交公式提取任务到后台线程...")
+                    # 修正：在提交任务前设置路径，避免竞态条件
+                    # 结果将保存在 output_dir/formulas/page_x.json (即 layer1/formulas/)
+                    self.formula_extractor.output_base_dir = output_dir
+                    
+                    formula_future = executor.submit(
+                        self.formula_extractor.extract_formulas, 
+                        file_path, 
+                        "formulas" 
+                    )
+                
+                # 2. 执行文本提取 (CPU/GPU密集型，主线程执行)
+                # 提取文本（extract_text 内部已经调用了 fix_markdown_image_paths）
+                text_result = self.extract_text(file_path)
+                markdown_text = text_result.get('text', '')
+                
+                # 清理图表OCR乱码（优先处理）
+                if self.chart_detector and text_result.get('image_mapping'):
+                    try:
+                        logger.info("开始清理图表OCR乱码...")
+                        markdown_text = self.chart_detector.clean_markdown(
+                            markdown_text,
+                            text_result.get('image_mapping', {})
+                        )
+                    except Exception as e:
+                        logger.warning(f"图表乱码清理失败: {e}")
+                
+                # 3. 执行表格提取 (GPU密集型，在Marker之后执行以避免显存冲突)
+                if self.use_table and self.table_extractor:
+                    logger.info("📊 开始表格提取任务...")
+                    try:
+                        # 修正：表格输出到 layer1 的父目录 (即 data/output/{doc_name}/)
+                        # 这样会生成 data/output/{doc_name}/tables 和 data/output/{doc_name}/figures
+                        doc_output_dir = output_dir.parent
+                        table_result = self.table_extractor.extract(
+                            str(file_path), 
+                            str(doc_output_dir)
+                        )
+                        logger.success(f"✓ 表格提取完成: {len(table_result)} 个项目")
+                    except Exception as e:
+                        logger.error(f"表格提取失败: {e}")
+                
+                # 4. 等待公式提取完成
+                if formula_future:
+                    logger.info("⏳ 等待公式提取完成...")
+                    try:
+                        formula_future.result() # 等待完成，如果有异常会在这里抛出
+                        logger.success("✓ 公式提取任务完成")
+                    except Exception as e:
+                        logger.error(f"公式提取任务异常: {e}")
+
             # 保存Markdown文件
             markdown_file = output_dir / f"{doc_name}.md"
             markdown_file.write_text(markdown_text, encoding='utf-8')
             logger.info(f"✓ 已保存Markdown到: {markdown_file}")
             
+            # 汇总所有元数据
+            final_metadata = {
+                'file_name': file_path.name,
+                'file_type': 'pdf',
+                'method': text_result.get('method', 'unknown'),
+                'pages': len(text_result.get('pages', [])),
+                'raw_metadata': text_result.get('metadata', {}),
+                'image_dir': text_result.get('image_dir'),
+                'image_count': len(text_result.get('image_mapping', {})),
+                'output_file': str(markdown_file),
+                'has_tables': len(table_result) > 0,
+                'has_formulas': self.use_formula, # 简单标记，具体看文件
+                'layer1_dir': str(output_dir)
+            }
+            
             # 转换为统一格式
             return {
                 'markdown': markdown_text,
-                'metadata': {
-                    'file_name': file_path.name,
-                    'file_type': 'pdf',
-                    'method': result.get('method', 'unknown'),
-                    'pages': len(result.get('pages', [])),
-                    'raw_metadata': result.get('metadata', {}),
-                    'image_dir': result.get('image_dir'),
-                    'image_count': len(result.get('image_mapping', {})),
-                    'output_file': str(markdown_file)
-                },
+                'metadata': final_metadata,
                 'success': True,
-                'pages': result.get('pages', []),
-                'raw_result': result,
-                'image_mapping': result.get('image_mapping', {}),
-                'image_dir': result.get('image_dir')
+                'pages': text_result.get('pages', []),
+                'raw_result': text_result,
+                'image_mapping': text_result.get('image_mapping', {}),
+                'image_dir': text_result.get('image_dir'),
+                'tables': table_result
             }
             
         except Exception as e:

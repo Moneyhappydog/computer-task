@@ -105,11 +105,9 @@ class TableExtractor:
         pdf_path = Path(pdf_path)
         output_dir = Path(output_dir)
         
-        # 创建两个文件夹：tables (真表格) 和 figures (误检的图)
+        # 创建表格文件夹 (不再创建 figures 文件夹)
         table_dir = output_dir / "tables"
-        figure_dir = output_dir / "figures" # 存放被剔除的流程图
         table_dir.mkdir(parents=True, exist_ok=True)
-        figure_dir.mkdir(parents=True, exist_ok=True)
         
         extracted_items = []
         
@@ -153,25 +151,24 @@ class TableExtractor:
                 is_real_table = check_result['is_table']
                 img_type = check_result['type']
                 
-                # 3. 根据分类结果保存到不同目录
-                save_dir = table_dir if is_real_table else figure_dir
-                prefix = "table" if is_real_table else "figure"
-                
-                filename = f"p{page_num}_{prefix}_{idx+1}.png"
-                save_path = save_dir / filename
-                cropped_img.save(save_path)
-                
-                log_icon = "✅" if is_real_table else "🗑️"
-                logger.info(f"  {log_icon} [P{page_num}] 检测为 {img_type} -> 保存至 {save_dir.name}")
-                
-                extracted_items.append({
-                    "path": str(save_path),
-                    "page": page_num,
-                    "is_table": is_real_table, # 只有 True 的才应该喂给后续的表格转写 AI
-                    "type": img_type
-                })
+                # 3. 仅保存真表格，丢弃非表格图片
+                if is_real_table:
+                    filename = f"p{page_num}_table_{idx+1}.png"
+                    save_path = table_dir / filename
+                    cropped_img.save(save_path)
+                    
+                    logger.info(f"  ✅ [P{page_num}] 检测为表格 -> 保存至 {table_dir.name}")
+                    
+                    extracted_items.append({
+                        "path": str(save_path),
+                        "page": page_num,
+                        "is_table": True,
+                        "type": img_type
+                    })
+                else:
+                    logger.info(f"  🗑️ [P{page_num}] 检测为 {img_type} (非表格) -> 已丢弃")
 
-        logger.info(f"处理完成。真表格: {len([x for x in extracted_items if x['is_table']])}，误检图表: {len([x for x in extracted_items if not x['is_table']])}")
+        logger.info(f"处理完成。共提取 {len(extracted_items)} 个表格")
         return extracted_items
 
 # --- 使用示例 ---
