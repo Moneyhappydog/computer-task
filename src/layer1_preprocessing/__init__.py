@@ -9,6 +9,8 @@ from .file_router import FileRouter
 from .image_extractor import ImageExtractor
 from .table_extractor import TableExtractor
 from .chart_detector import ChartDetector
+from .formula_extractor import GPTFormulaExtractorJSON
+from .merge_processor import MarkdownJsonMerger
 
 __all__ = [
     'PDFProcessor',
@@ -17,5 +19,7 @@ __all__ = [
     'FileRouter',
     'ImageExtractor',
     'TableExtractor',
-    'ChartDetector'
+    'ChartDetector',
+    'GPTFormulaExtractorJSON',
+    'MarkdownJsonMerger'
 ]

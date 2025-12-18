@@ -28,21 +28,21 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class TableExtractorTATR:
+class TableExtractor:
     def __init__(self, api_key: str = None):
         """
         初始化微软 Table Transformer 模型 和 OpenAI 客户端
         """
-        # 1. 初始化 TATR 模型
+        # 1. 初始化 Table Transformer 模型
         logger.info("正在加载 Microsoft Table Transformer 模型...")
         try:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
             self.processor = DetrImageProcessor.from_pretrained("microsoft/table-transformer-detection")
             self.model = TableTransformerForObjectDetection.from_pretrained("microsoft/table-transformer-detection")
             self.model.to(self.device)
-            logger.info(f"✅ TATR 模型加载成功 (运行设备: {self.device})")
+            logger.info(f"✅ Table Transformer 模型加载成功 (运行设备: {self.device})")
         except Exception as e:
-            logger.error(f"❌ TATR 模型加载失败: {e}")
+            logger.error(f"❌ Table Transformer 模型加载失败: {e}")
             raise e
 
         # 2. 初始化 OpenAI (用于过滤非表格图片)
@@ -131,7 +131,7 @@ class TableExtractorTATR:
             results = self.processor.post_process_object_detection(outputs, threshold=threshold, target_sizes=target_sizes)[0]
 
             if len(results['boxes']) > 0:
-                logger.info(f"Page {page_num}: TATR 初步检测到 {len(results['boxes'])} 个目标")
+                logger.info(f"Page {page_num}: 初步检测到 {len(results['boxes'])} 个目标")
 
             for idx, (score, box) in enumerate(zip(results['scores'], results['boxes'])):
                 if score < threshold: continue
@@ -177,7 +177,7 @@ class TableExtractorTATR:
 # --- 使用示例 ---
 if __name__ == "__main__":
     # 使用 response/gpt.py 中的 API Key
-    extractor = TableExtractorTATR(api_key=openai_api_key)
+    extractor = TableExtractor(api_key=openai_api_key)
     
     results = extractor.extract(
         pdf_path="data/input/2023CVPR-CoMFormer.pdf",
