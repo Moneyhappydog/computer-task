@@ -167,7 +167,8 @@ class ContentFusionProcessor:
         
         # 构造用户消息
         user_content = [
-            {"type": "text", "text": f"### Page {page_num} Raw Markdown:\n\n{text}\n\n"}
+            {"type": "text", "text": f"### Page {page_num} Raw Markdown:\n\n{text}\n\n"},
+            {"type": "text", "text": "⚠️ **CRITICAL INSTRUCTION**: Do NOT move, reorder, or delete any existing image links (e.g., `![](...)`) in the markdown. Keep them exactly where they are relative to the text. Only fix the text content and insert tables if needed."}
         ]
         
         # 添加公式信息

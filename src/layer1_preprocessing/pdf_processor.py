@@ -243,12 +243,18 @@ class PDFProcessor:
                         logger.warning(f"OCR 兜底失败: {e}")
 
                 # 处理图片键名冲突
-                # Marker通常返回 image_name -> PIL Image
-                # 我们需要重命名图片以包含页码信息
+                # Marker通常返回 image_name -> PIL Image (例如 0_image_0.png)
+                # 我们需要重命名图片以包含页码信息，并去除多余的前缀
                 renamed_images = {}
                 for img_name, img_obj in page_images.items():
-                    new_name = f"page_{page_num}_{img_name}"
+                    # 去除可能存在的 "0_" 前缀 (Marker处理单页时常出现)
+                    clean_name = img_name
+                    if clean_name.startswith("0_"):
+                        clean_name = clean_name[2:]
+                    
+                    new_name = f"page_{page_num}_{clean_name}"
                     renamed_images[new_name] = img_obj
+                    
                     # 更新文本中的引用
                     if img_name in page_text:
                         page_text = page_text.replace(img_name, new_name)

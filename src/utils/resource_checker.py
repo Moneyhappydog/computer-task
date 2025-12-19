@@ -44,12 +44,12 @@ def check_resources(page_path):
     }
 
     # 检查图像目录
-    # 匹配模式: {page_num}_image_{序号}.png
+    # 匹配模式: page_{page_num}_image_{序号}.png
     if os.path.exists(image_dir):
         for filename in os.listdir(image_dir):
             if filename.endswith(('.png', '.jpg', '.jpeg')):
-                # 匹配 {page_num}_image_{X}.png 格式
-                match = re.match(rf'^{page_num}_image_(\d+)\.(png|jpg|jpeg)$', filename)
+                # 匹配 page_{page_num}_image_{X}.png 格式
+                match = re.match(rf'^page_{page_num}_image_(\d+)\.(png|jpg|jpeg)$', filename)
                 if match:
                     image_path = os.path.join(image_dir, filename)
                     result["images"].append(image_path)
@@ -80,9 +80,9 @@ def check_resources(page_path):
 if __name__ == "__main__":
     # 示例用法
     print("=" * 60)
-    print("测试 page_2.md")
+    print("测试 page_1.md")
     print("=" * 60)
-    test_page = "data/output/2023CVPR-CoMFormer/pages/page_2.md"
+    test_page = "data/output/2023CVPR-CoMFormer/pages/page_1.md"
     result = check_resources(test_page)
     print(f"\n检测结果:")
     print(f"图像数量: {len(result['images'])}")

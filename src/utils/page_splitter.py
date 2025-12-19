@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import logging
+import re
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -44,13 +45,17 @@ class PageSplitter:
         logger.info(f"Found {len(pages)} pages.")
         
         for i, page_content in enumerate(pages):
+            # Remove the page marker <!-- Page X -->
+            # The marker was added by pdf_processor to ensure page existence
+            clean_content = re.sub(r'<!-- Page \d+ -->', '', page_content).strip()
+            
             page_num = i + 1
             # Naming format: page_{page_num}.md to be consistent with other layer files
             page_filename = f"page_{page_num}.md"
             page_file_path = output_path / page_filename
             
             # Write content
-            page_file_path.write_text(page_content.strip(), encoding='utf-8')
+            page_file_path.write_text(clean_content, encoding='utf-8')
             logger.info(f"Saved page {page_num} to {page_file_path}")
 
 if __name__ == "__main__":
