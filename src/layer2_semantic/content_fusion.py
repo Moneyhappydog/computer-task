@@ -13,6 +13,8 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.utils.config import Config
 from src.prompt import prompt_confusion
+from src.utils.page_splitter import PageSplitter
+from src.utils.resource_checker import check_resources
 
 # 尝试导入 OpenAI
 try:
@@ -68,29 +70,40 @@ class ContentFusionProcessor:
         layer1_dir = base_output_dir / "layer1"
         md_file = layer1_dir / f"{doc_name}.md"
         formulas_dir = layer1_dir / "formulas"
-        tables_dir = base_output_dir / "tables"
+        pages_dir = base_output_dir / "pages"
         
         if not md_file.exists():
             raise FileNotFoundError(f"找不到 Layer 1 的 Markdown 文件: {md_file}")
 
         logger.info(f"🚀 开始文档融合: {doc_name}")
         
-        # 2. 读取并切分 Markdown
-        raw_text = md_file.read_text(encoding='utf-8')
-        # Marker 通常用 "\n---\n" 分页，但也可能没有，视情况而定
-        # 这里我们假设 Marker 输出了分页符。如果没有，可能需要按长度切分或视为第1页
-        pages = raw_text.split("\n---\n")
-        if len(pages) == 1 and "---" not in raw_text:
-            logger.warning("未检测到分页符，将整个文档视为第 1 页处理")
+        # 2. 先使用 PageSplitter 将 Markdown 分页保存
+        logger.info(f"📄 正在分页保存 Markdown...")
+        splitter = PageSplitter()
+        splitter.split_markdown(str(md_file), str(pages_dir))
+        
+        # 3. 获取所有分页文件
+        page_files = sorted(pages_dir.glob("page_*.md"), key=lambda x: int(x.stem.split('_')[1]))
+        if not page_files:
+            raise FileNotFoundError(f"分页失败，未找到任何页面文件: {pages_dir}")
+        
+        logger.info(f"✅ 找到 {len(page_files)} 个分页文件")
         
         fused_pages = []
         
-        # 3. 逐页处理
-        for i, page_text in enumerate(pages):
-            page_num = i + 1
-            logger.info(f"📄 正在融合第 {page_num} 页...")
+        # 4. 逐页处理
+        for page_file in page_files:
+            # 提取页码
+            page_num = int(page_file.stem.split('_')[1])
+            logger.info(f"📄 正在融合第 {page_num} 页: {page_file.name}")
             
-            # 3.1 获取该页的公式数据
+            # 4.1 读取该页的 Markdown 内容
+            page_text = page_file.read_text(encoding='utf-8')
+            
+            # 4.2 使用 resource_checker 获取该页的所有资源
+            resources = check_resources(str(page_file))
+            
+            # 4.3 获取该页的公式数据
             page_formulas = []
             formula_file = formulas_dir / f"page_{page_num}.json"
             if formula_file.exists():
@@ -101,55 +114,25 @@ class ContentFusionProcessor:
                 except Exception as e:
                     logger.warning(f"读取公式文件失败 {formula_file}: {e}")
             
-            # 3.2 获取该页的表格图片
-            # 假设表格命名格式: p{page_num}_table_{idx}.png
-            page_tables = []
-            if tables_dir.exists():
-                # 查找所有以 p{page_num}_table 开头的文件
-                for table_file in tables_dir.glob(f"p{page_num}_table_*.png"):
-                    page_tables.append(table_file)
+            # 4.4 从 resource_checker 获取的资源中分离图片和表格
+            page_images = [Path(img) for img in resources.get("images", [])]
+            page_tables = [Path(tbl) for tbl in resources.get("tables", []) if tbl.endswith('.png')]
             
-            # 3.3 获取该页引用的图片 (Figures)
-            page_figures = []
-            # 查找 Markdown 中的图片链接: ![alt](path)
-            # 路径通常是相对路径，如 ../images/xxx.png
-            matches = re.findall(r'!\[.*?\]\((.*?)\)', page_text)
-            for img_path_str in matches:
-                # 过滤掉表格图片（如果表格图片也被引用了的话，通常表格在 tables/ 目录，而 figures 在 images/ 目录）
-                if "tables/" in img_path_str:
-                    continue
-                    
-                try:
-                    # 解析图片绝对路径
-                    # md_file 在 layer1/xxx.md
-                    # img_path_str 如 ../images/xxx.png
-                    img_full_path = (md_file.parent / img_path_str).resolve()
-                    
-                    if img_full_path.exists():
-                        page_figures.append(img_full_path)
-                    else:
-                        # 尝试直接在 images 目录查找 (容错)
-                        images_dir = base_output_dir / "images" # data/output/{doc}/images
-                        img_name = Path(img_path_str).name
-                        alt_path = images_dir / img_name
-                        if alt_path.exists():
-                            page_figures.append(alt_path)
-                except Exception as e:
-                    logger.warning(f"无法解析图片路径: {img_path_str} - {e}")
+            logger.info(f"  - 找到 {len(page_images)} 个图片，{len(page_tables)} 个表格，{len(page_formulas)} 个公式")
 
-            # 3.4 调用 AI 进行融合
+            # 4.5 调用 AI 进行融合
             fused_text = self._process_single_page(
                 page_num=page_num,
                 text=page_text,
                 formulas=page_formulas,
                 table_paths=page_tables,
-                figure_paths=page_figures,
+                figure_paths=page_images,
                 doc_name=doc_name
             )
             
             fused_pages.append(fused_text)
         
-        # 4. 合并结果并保存
+        # 5. 合并结果并保存
         final_markdown = "\n\n---\n\n".join(fused_pages)
         
         # 保存到 layer2 目录 (或者 layer1_fused)
@@ -164,7 +147,7 @@ class ContentFusionProcessor:
         return {
             "success": True,
             "output_file": str(output_file),
-            "pages_processed": len(pages)
+            "pages_processed": len(page_files)
         }
 
     def _process_single_page(

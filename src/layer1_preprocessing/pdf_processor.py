@@ -12,6 +12,9 @@ import json
 import re
 import difflib
 from io import BytesIO
+import fitz
+import tempfile
+import shutil
 
 # 导入工具模块
 import sys
@@ -71,14 +74,7 @@ class PDFProcessor:
                 logger.warning(f"OCR处理器初始化失败，将不使用OCR: {e}")
                 self.use_ocr = False
         
-        # 2. 初始化图表检测器（默认启用）
-        try:
-            self.chart_detector = ChartDetector()
-            logger.success("✓ 图表检测器初始化成功")
-        except Exception as e:
-            logger.warning(f"图表检测器初始化失败: {e}")
-            self.chart_detector = None
-            
+        
         # 3. 初始化表格提取器
         if self.use_table:
             try:
@@ -180,60 +176,112 @@ class PDFProcessor:
         return best_result
     
     def _extract_with_marker(self, pdf_path: Path, session_id: Optional[str] = None) -> Dict:
-        """使用Marker进行智能PDF解析（深度学习方案）- 内存优化版"""
-        logger.info("使用Marker进行智能PDF解析...")
+        """使用Marker进行智能PDF解析（深度学习方案）- 内存优化版 + 强制分页"""
+        logger.info("使用Marker进行智能PDF解析（强制分页模式）...")
         
+        temp_dir = Path(tempfile.mkdtemp())
         try:
-            logger.info("准备调用convert_single_pdf函数...")
-            logger.info(f"参数：pdf_path={str(pdf_path)}, marker_models={self.marker_models}")
+            # 1. 拆分PDF
+            doc = fitz.open(pdf_path)
+            num_pages = len(doc)
+            logger.info(f"PDF共 {num_pages} 页，正在拆分处理...")
             
-            # 关键修改：添加内存优化参数
-            result = self.convert_single_pdf(
-                str(pdf_path),
-                self.marker_models,
-                max_pages=None,        # 处理所有页面
-                langs=None,            # 自动检测语言
-                batch_multiplier=1,    # 批处理倍数（控制内存使用）
-            )
+            full_text_parts = []
+            all_images = {}
+            all_metadata = {}
             
-            logger.info("convert_single_pdf函数调用成功，开始处理返回值...")
-            
-            # 灵活处理convert_single_pdf的返回值
-            if isinstance(result, tuple):
-                # 打印调试信息，查看返回值数量
-                logger.info(f"convert_single_pdf返回了 {len(result)} 个值")
+            for i in range(num_pages):
+                page_num = i + 1
+                page_pdf_path = temp_dir / f"page_{page_num}.pdf"
                 
-                # 根据返回值数量进行处理
-                if len(result) >= 3:
-                    full_text, images, metadata = result[0], result[1], result[2]
-                elif len(result) == 2:
-                    full_text, metadata = result
-                    images = {}
-                elif len(result) == 1:
-                    full_text = result[0]
-                    images = {}
-                    metadata = {}
+                # 保存单页PDF
+                new_doc = fitz.open()
+                new_doc.insert_pdf(doc, from_page=i, to_page=i)
+                new_doc.save(page_pdf_path)
+                new_doc.close()
+                
+                logger.info(f"正在处理第 {page_num}/{num_pages} 页...")
+                
+                # 调用Marker处理单页
+                try:
+                    result = self.convert_single_pdf(
+                        str(page_pdf_path),
+                        self.marker_models,
+                        max_pages=None,
+                        langs=None,
+                        batch_multiplier=1,
+                    )
+                except Exception as e:
+                    logger.warning(f"第 {page_num} 页 Marker 处理失败: {e}")
+                    result = ""
+                
+                # 解析结果
+                page_text = ""
+                page_images = {}
+                page_meta = {}
+                
+                if isinstance(result, tuple):
+                    if len(result) >= 3:
+                        page_text, page_images, page_meta = result[0], result[1], result[2]
+                    elif len(result) == 2:
+                        page_text, page_meta = result
+                    elif len(result) == 1:
+                        page_text = result[0]
                 else:
-                    # 空元组
-                    full_text = ""
-                    images = {}
-                    metadata = {}
-            else:
-                # 如果返回的不是元组，直接作为文本处理
-                full_text = result
-                images = {}
-                metadata = {}
+                    page_text = str(result) if result else ""
+                
+                # 1. OCR 兜底机制：如果Marker结果为空，尝试OCR
+                if not page_text.strip() and self.use_ocr and self.ocr_processor:
+                    logger.warning(f"第 {page_num} 页 Marker 提取为空，尝试使用 OCR 兜底...")
+                    try:
+                        # OCRProcessor.ocr_pdf 返回列表，我们只需要第一页
+                        ocr_results = self.ocr_processor.ocr_pdf(page_pdf_path)
+                        if ocr_results:
+                            page_text = ocr_results[0].get("text", "")
+                            logger.info(f"OCR 兜底成功，提取了 {len(page_text)} 个字符")
+                    except Exception as e:
+                        logger.warning(f"OCR 兜底失败: {e}")
+
+                # 处理图片键名冲突
+                # Marker通常返回 image_name -> PIL Image
+                # 我们需要重命名图片以包含页码信息
+                renamed_images = {}
+                for img_name, img_obj in page_images.items():
+                    new_name = f"page_{page_num}_{img_name}"
+                    renamed_images[new_name] = img_obj
+                    # 更新文本中的引用
+                    if img_name in page_text:
+                        page_text = page_text.replace(img_name, new_name)
+                
+                # 2. 图片引用补全：防止图片丢失
+                for new_name in renamed_images.keys():
+                    if new_name not in page_text:
+                        logger.info(f"补全第 {page_num} 页丢失的图片引用: {new_name}")
+                        page_text += f"\n\n![]({new_name})\n"
+                
+                all_images.update(renamed_images)
+                if page_meta:
+                    all_metadata.update(page_meta) # 简单合并
+                
+                # 3. 强制页面标记：确保分页结构完整
+                final_page_text = f"<!-- Page {page_num} -->\n{page_text}"
+                full_text_parts.append(final_page_text)
+            
+            doc.close()
+            
+            # 合并文本
+            full_text = "\n---\n".join(full_text_parts)
             
             # 提取并保存图片
             image_mapping = {}
             image_dir = None
             doc_name = pdf_path.stem
             
-            if images:
+            if all_images:
                 try:
                     extractor = ImageExtractor()
                     result_dict = extractor.extract_and_save_images(
-                        images=images,
+                        images=all_images,
                         doc_name=doc_name
                     )
                     image_mapping = result_dict['image_mapping']
@@ -246,27 +294,13 @@ class PDFProcessor:
                 except Exception as e:
                     logger.warning(f"图片提取失败: {e}")
             
-            # Marker返回的是markdown格式，需要按页分割
+            # 构建页面列表
             pages = []
-            page_texts = full_text.split("\n---\n")  # Marker用---分隔页面
-            
-            # 如果Marker未能正确分页，尝试使用AI修复
-            if len(page_texts) == 1 and self.client:
-                logger.warning("⚠️ Marker未能检测到分页符，尝试使用AI进行分页修复...")
-                try:
-                    fixed_text = self._fix_pagination_with_ai(full_text, pdf_path)
-                    if fixed_text != full_text:
-                        full_text = fixed_text
-                        page_texts = full_text.split("\n---\n")
-                        logger.success(f"✅ AI分页修复成功，检测到 {len(page_texts)} 页")
-                except Exception as e:
-                    logger.error(f"❌ AI分页修复失败: {e}")
-
-            for i, page_text in enumerate(page_texts, 1):
+            for i, page_text in enumerate(full_text_parts, 1):
                 pages.append({
                     "page": i,
                     "text": page_text,
-                    "images": images.get(i, []),
+                    "images": {}, # 图片已经在上面统一处理了
                     "has_text": len(page_text.strip()) > 0
                 })
             
@@ -275,7 +309,7 @@ class PDFProcessor:
             return {
                 "text": full_text,
                 "pages": pages,
-                "metadata": metadata,
+                "metadata": all_metadata,
                 "method": "marker",
                 "image_mapping": image_mapping,
                 "image_dir": str(image_dir) if image_dir else None
@@ -286,49 +320,15 @@ class PDFProcessor:
             logger.error(f"Marker提取过程出错: {e}")
             logger.error(f"详细错误信息: {traceback.format_exc()}")
             raise  # 重新抛出异常，让上层处理回退
+        finally:
+            # 清理临时目录
+            if temp_dir.exists():
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception as e:
+                    logger.warning(f"清理临时目录失败: {e}")
     
-    # def _extract_with_pdfplumber(self, pdf_path: Path) -> Dict:
-    #     """
-    #     使用pdfplumber提取文本（传统方案）
-    #     """
-    #     logger.info("使用pdfplumber进行文本提取...")
-    #     
-    #     pages = []
-    #     full_text = []
-    #     
-    #     try:
-    #         with pdfplumber.open(pdf_path) as pdf:
-    #             metadata = pdf.metadata or {}
-    #             
-    #             for i, page in enumerate(pdf.pages, 1):
-    #                 text = page.extract_text() or ""
-    #                 images = page.images or []
-    #                 
-    #                 pages.append({
-    #                     "page": i,
-    #                     "text": text,
-    #                     "images": images,
-    #                     "has_text": len(text.strip()) > 50  # 超过50字符认为有文本
-    #                 })
-    #                 
-    #                 full_text.append(text)
-    #                 
-    #                 logger.debug(f"  页面 {i}: {len(text)} 字符, {len(images)} 个图片")
-    #         
-    #         full_text_str = "\n\n".join(full_text)
-    #         logger.success(f"✓ pdfplumber提取完成: {len(pages)} 页，共 {len(full_text_str)} 字符")
-    #         
-    #         return {
-    #             "text": full_text_str,
-    #             "pages": pages,
-    #             "metadata": metadata,
-    #             "method": "pdfplumber"
-    #         }
-    #         
-    #     except Exception as e:
-    #         logger.error(f"pdfplumber提取失败: {e}")
-    #         raise
-    
+
     def process(self, file_path: Path) -> Dict[str, Any]:
         """
         处理PDF文件（并行执行多模态提取）
@@ -372,17 +372,6 @@ class PDFProcessor:
                 # 提取文本（extract_text 内部已经调用了 fix_markdown_image_paths）
                 text_result = self.extract_text(file_path)
                 markdown_text = text_result.get('text', '')
-                
-                # 清理图表OCR乱码（优先处理）
-                if self.chart_detector and text_result.get('image_mapping'):
-                    try:
-                        logger.info("开始清理图表OCR乱码...")
-                        markdown_text = self.chart_detector.clean_markdown(
-                            markdown_text,
-                            text_result.get('image_mapping', {})
-                        )
-                    except Exception as e:
-                        logger.warning(f"图表乱码清理失败: {e}")
                 
                 # 3. 执行表格提取 (GPU密集型，在Marker之后执行以避免显存冲突)
                 if self.use_table and self.table_extractor:
