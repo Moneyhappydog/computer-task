@@ -67,6 +67,51 @@ def test_from_layer2_output(layer2_output_dir: Path, use_ai: bool = False):
     with open(layer3_result_file, 'w', encoding='utf-8') as f:
         json.dump(layer3_result, f, ensure_ascii=False, indent=2)
     
+    # 处理References：从Layer1 Markdown提取并生成独立的References DITA文件
+    print(f"\n📚 处理References（从Layer1 Markdown提取）...")
+    try:
+        from src.layer3_dita_conversion.references_processor import ReferencesProcessor
+        
+        # 查找Layer1的Markdown文件
+        layer1_output_dir = layer2_output_dir.parent / "layer1"
+        layer1_markdown_file = None
+        
+        # 尝试找到Markdown文件
+        if layer1_output_dir.exists():
+            # 查找 .md 文件
+            md_files = list(layer1_output_dir.glob("*.md"))
+            if md_files:
+                layer1_markdown_file = md_files[0]  # 使用第一个找到的.md文件
+                print(f"   ✅ 找到Layer1 Markdown文件: {layer1_markdown_file}")
+            else:
+                print(f"   ⚠️  Layer1目录中没有找到Markdown文件: {layer1_output_dir}")
+        
+        if layer1_markdown_file and layer1_markdown_file.exists():
+            # 使用References提取模块
+            references_processor = ReferencesProcessor(linkify_citations=True)
+            references_result = references_processor.process(
+                layer3_output_dir=output_dir,
+                markdown_path=layer1_markdown_file,
+                layer2_result_path=layer2_result_file
+            )
+            
+            if references_result['success']:
+                print(f"   ✅ References处理成功: {references_result['statistics']['total_references']} 个条目")
+                if references_result.get('statistics', {}).get('linkified_count', 0) > 0:
+                    print(f"   ✅ 已链接化 {references_result['statistics']['linkified_count']} 个正文引文")
+            else:
+                print(f"   ⚠️  References处理失败: {references_result.get('error', '未知错误')}")
+        else:
+            print(f"   ⚠️  未找到Layer1 Markdown文件，跳过References提取")
+            print(f"      请确保Layer1的输出目录存在: {layer1_output_dir}")
+    
+    except ImportError as e:
+        print(f"   ⚠️  无法导入References处理器: {e}")
+    except Exception as e:
+        print(f"   ⚠️  References处理过程中发生错误: {e}")
+        import traceback
+        traceback.print_exc()
+    
     # 显示结果
     if layer3_result['failed'] > 0:
         print(f"⚠️  DITA转换部分失败: {layer3_result['failed']} 个块失败")

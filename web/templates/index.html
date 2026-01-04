@@ -77,11 +77,12 @@
                     <i class="fas fa-file-import"></i>
                 </div>
                 <h3>Layer 1: 预处理</h3>
-                <p>自动识别文档类型，提取结构化内容</p>
+                <p>将各种格式的文档转换为统一的 Markdown 格式，提取结构化内容</p>
                 <ul class="feature-list">
-                    <li>PDF/Word 解析</li>
-                    <li>OCR 文字识别</li>
-                    <li>Markdown 转换</li>
+                    <li>文件路由与类型识别</li>
+                    <li>PDF/Word 智能解析</li>
+                    <li>文本、图片、表格、公式提取</li>
+                    <li>Markdown 格式转换</li>
                 </ul>
             </div>
             
@@ -90,11 +91,12 @@
                     <i class="fas fa-brain"></i>
                 </div>
                 <h3>Layer 2: 语义分析</h3>
-                <p>AI驱动的内容分类与理解</p>
+                <p>对 Markdown 文本进行语义理解，按内容类型分类为 Task/Concept/Reference</p>
                 <ul class="feature-list">
-                    <li>智能文本分块</li>
-                    <li>Task/Concept/Reference 分类</li>
-                    <li>置信度评估</li>
+                    <li>按标题智能文本分块</li>
+                    <li>NLP 特征提取（词性、实体、结构）</li>
+                    <li>三层分类器（规则→LLM→人工审核）</li>
+                    <li>置信度评估与结果融合</li>
                 </ul>
             </div>
             
@@ -103,11 +105,12 @@
                     <i class="fas fa-code"></i>
                 </div>
                 <h3>Layer 3: DITA转换</h3>
-                <p>生成符合规范的DITA XML</p>
+                <p>将分类后的语义块转换为符合 DITA 规范的 XML 文件</p>
                 <ul class="feature-list">
-                    <li>模板驱动生成</li>
-                    <li>结构化数据提取</li>
-                    <li>XML验证</li>
+                    <li>根据类型选择模板（Task/Concept/Reference）</li>
+                    <li>内容结构化与数据提取</li>
+                    <li>DITA 约束验证</li>
+                    <li>批量生成 DITA XML 文件</li>
                 </ul>
             </div>
             
@@ -116,13 +119,29 @@
                     <i class="fas fa-shield-alt"></i>
                 </div>
                 <h3>Layer 4: 质量保证</h3>
-                <p>确保最高质量标准</p>
+                <p>验证和修复 DITA 文档，确保完全符合 DITA 标准和自定义规范</p>
                 <ul class="feature-list">
-                    <li>DITA标准验证</li>
-                    <li>自定义规则检查</li>
-                    <li>智能错误修复</li>
+                    <li>DITA-OT 标准验证与修复循环</li>
+                    <li>自定义规则检查（图片引用、链接等）</li>
+                    <li>AI 智能错误修复</li>
+                    <li>质量评分与详细报告</li>
                 </ul>
             </div>
+        </div>
+    </section>
+    
+    <!-- 手动修复功能入口 -->
+    <section class="option-c-section" style="margin-top: 3rem; padding: 2rem; background: #f8f9fa; border-radius: 8px;">
+        <div class="container">
+            <h2 style="margin-bottom: 1rem;">
+                <i class="fas fa-tools"></i> 手动修复 DITA 包
+            </h2>
+            <p style="margin-bottom: 1.5rem; color: #666;">
+                已下载转换结果 ZIP 并在本地修改？上传修改后的 ZIP 包，系统将执行验证、可选引文链接化和可选 DITA-OT 构建。
+            </p>
+            <a href="/repair" class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+                <i class="fas fa-upload"></i> 前往手动修复页面
+            </a>
         </div>
     </section>
 </div>

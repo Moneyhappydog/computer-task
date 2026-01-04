@@ -57,15 +57,14 @@ class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
     
-    # 生产环境使用更安全的密钥
-    SECRET_KEY = os.environ.get('SECRET_KEY')
-    if not SECRET_KEY:
-        raise ValueError("生产环境必须设置 SECRET_KEY 环境变量")
+    # 生产环境使用更安全的密钥（延迟检查，在 get_config 中验证）
+    # 这里先使用默认值，实际检查在 get_config 中进行
+    SECRET_KEY = os.environ.get('SECRET_KEY') or None
     
     # 生产环境限制CORS
-    cors_origins = os.environ.get('CORS_ORIGINS', '')
-    if cors_origins:
-        SOCKETIO_CORS_ALLOWED_ORIGINS = cors_origins.split(',')
+    _cors_origins = os.environ.get('CORS_ORIGINS', '')
+    if _cors_origins:
+        SOCKETIO_CORS_ALLOWED_ORIGINS = _cors_origins.split(',')
 
 class TestingConfig(Config):
     """测试环境配置"""
@@ -97,4 +96,13 @@ def get_config(env=None):
     if env is None:
         env = os.environ.get('FLASK_ENV', 'development')
     
-    return config.get(env, config['default'])
+    config_class = config.get(env, config['default'])
+    
+    # 如果是生产环境，检查 SECRET_KEY
+    if env == 'production':
+        if not os.environ.get('SECRET_KEY'):
+            raise ValueError("生产环境必须设置 SECRET_KEY 环境变量")
+        # 确保使用环境变量中的密钥
+        config_class.SECRET_KEY = os.environ.get('SECRET_KEY')
+    
+    return config_class

@@ -106,10 +106,12 @@ def register_blueprints(app):
         # 导入路由蓝图
         from web.routes.main import bp as main_bp
         from web.routes.api import bp as api_bp
+        from web.routes.repair import bp as repair_bp
         
         # 注册蓝图
         app.register_blueprint(main_bp)
         app.register_blueprint(api_bp, url_prefix='/api')
+        app.register_blueprint(repair_bp)  # 修复路由不需要前缀
         
         app.logger.info("✓ 蓝图注册完成")
     except ImportError as e:

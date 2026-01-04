@@ -121,10 +121,25 @@ class ConversionProcessor {
                 const filenameEl = document.getElementById('filename');
                 if (filenameEl && data.filename) {
                     filenameEl.textContent = data.filename;
+                    this.filename = data.filename; // 保存文件名
                 }
 
                 // 更新进度（传递层数据）
-                this.updateProgress(data.progress, data.message, data.layers);
+                // 从后端返回的 layers 中提取数据
+                const layersData = {};
+                if (data.layers) {
+                    Object.keys(data.layers).forEach(layerKey => {
+                        const layerInfo = data.layers[layerKey];
+                        layersData[layerKey] = {
+                            progress: layerInfo.progress || 0,
+                            message: layerInfo.message || '',
+                            status: layerInfo.status || 'pending',
+                            data: layerInfo.data || {}
+                        };
+                    });
+                }
+                
+                this.updateProgress(data.progress, data.message, layersData);
 
                 // 检查是否完成
                 if (data.status === 'completed') {
@@ -170,6 +185,17 @@ class ConversionProcessor {
 
         // 更新各层进度（使用真实的层进度数据）
         this.updateLayerProgress(layersData);
+        
+        // 如果进度数据中包含详细信息，也更新统计
+        if (layersData) {
+            Object.keys(layersData).forEach(layerKey => {
+                const layerData = layersData[layerKey];
+                if (layerData && layerData.data) {
+                    const layerNum = parseInt(layerKey.replace('layer', ''));
+                    this.updateLayerStatsFromData(layerNum, layerData.data);
+                }
+            });
+        }
     }
 
     // 更新各层进度
@@ -190,9 +216,10 @@ class ConversionProcessor {
 
             // 只在有层数据时更新
             if (layerData) {
-                let layerProgress = layerData.progress;
-                let layerMessage = layerData.message;
-                let layerStatus = layerData.status;
+                let layerProgress = layerData.progress || 0;
+                let layerMessage = layerData.message || '';
+                let layerStatus = layerData.status || 'pending';
+                let layerDetails = layerData.data || {};
 
                 const layerBar = layer.querySelector('.layer-progress-fill');
                 const layerText = layer.querySelector('.progress-text');
@@ -234,8 +261,78 @@ class ConversionProcessor {
                 if (layerMessageEl) {
                     layerMessageEl.textContent = layerMessage;
                 }
+
+                // 更新各层的统计信息（从进度回调的data中获取）
+                this.updateLayerStatsFromData(layerNum, layerDetails);
             }
         });
+    }
+
+    // 从进度数据中更新层统计信息
+    updateLayerStatsFromData(layerNum, data) {
+        if (!data) return;
+
+        switch (layerNum) {
+            case 1: // Layer 1: 预处理
+                if (data.file_type) {
+                    const el = document.getElementById('layer1-file-type');
+                    if (el) el.textContent = data.file_type.toUpperCase();
+                }
+                if (data.markdown_length) {
+                    const el = document.getElementById('layer1-text-length');
+                    if (el) el.textContent = this.formatFileSize(data.markdown_length);
+                }
+                break;
+
+            case 2: // Layer 2: 语义分析
+                if (data.total_chunks !== undefined) {
+                    const el = document.getElementById('layer2-chunk-count');
+                    if (el) el.textContent = data.total_chunks;
+                }
+                if (data.type_distribution) {
+                    const dist = data.type_distribution;
+                    const distText = Object.entries(dist)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(', ');
+                    const el = document.getElementById('layer2-type-dist');
+                    if (el) el.textContent = distText || '--';
+                }
+                if (data.overall_avg_confidence !== undefined) {
+                    const el = document.getElementById('layer2-confidence');
+                    if (el) el.textContent = (data.overall_avg_confidence * 100).toFixed(1) + '%';
+                }
+                break;
+
+            case 3: // Layer 3: DITA转换
+                if (data.success_count !== undefined) {
+                    const el = document.getElementById('layer3-dita-count');
+                    if (el) el.textContent = data.success_count;
+                }
+                if (data.total !== undefined) {
+                    const el = document.getElementById('layer3-total-count');
+                    if (el) el.textContent = data.total;
+                }
+                if (data.success_rate !== undefined) {
+                    const el = document.getElementById('layer3-success-rate');
+                    if (el) el.textContent = Math.round(data.success_rate * 100) + '%';
+                }
+                break;
+
+            case 4: // Layer 4: 质量保证
+                if (data.avg_quality !== undefined) {
+                    const el = document.getElementById('layer4-quality-score');
+                    if (el) el.textContent = Math.round(data.avg_quality) + '/100';
+                }
+                if (data.success !== undefined) {
+                    const el = document.getElementById('layer4-success-count');
+                    if (el) el.textContent = data.success;
+                }
+                if (data.total !== undefined) {
+                    const el = document.getElementById('layer4-total-count');
+                    if (el) el.textContent = data.total;
+                }
+                break;
+        }
     }
 
     // 更新层统计信息
@@ -258,33 +355,69 @@ class ConversionProcessor {
 
     // 更新层统计显示
     updateLayerStatsDisplay(layerNum, data) {
-        const layerCard = document.querySelector(`.layer-card:nth-child(${layerNum})`);
-        if (!layerCard) return;
-
-        const statsEl = layerCard.querySelector('.layer-stats');
-        if (!statsEl) return;
+        if (!data || !data.success) return;
 
         switch (layerNum) {
-            case 1: // 预处理层
+            case 1: // Layer 1: 预处理层
                 if (data.file_type) {
-                    statsEl.innerHTML = `<span class="file-type">文件类型: <strong>${data.file_type}</strong></span>`;
+                    const el = document.getElementById('layer1-file-type');
+                    if (el) el.textContent = data.file_type.toUpperCase();
+                }
+                if (data.markdown_length) {
+                    const el = document.getElementById('layer1-text-length');
+                    if (el) el.textContent = this.formatFileSize(data.markdown_length);
                 }
                 break;
-            case 2: // 语义分析层
-                if (data.chunks && data.chunks.length > 0) {
-                    statsEl.innerHTML = `<span class="chunk-count">分块数量: <strong>${data.chunks.length}</strong></span>`;
+
+            case 2: // Layer 2: 语义分析层
+                if (data.total_chunks !== undefined) {
+                    const el = document.getElementById('layer2-chunk-count');
+                    if (el) el.textContent = data.total_chunks;
+                }
+                if (data.statistics) {
+                    const stats = data.statistics;
+                    if (stats.type_distribution) {
+                        const dist = stats.type_distribution;
+                        const distText = Object.entries(dist)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(', ');
+                        const el = document.getElementById('layer2-type-dist');
+                        if (el) el.textContent = distText || '--';
+                    }
+                    if (stats.overall_avg_confidence !== undefined) {
+                        const el = document.getElementById('layer2-confidence');
+                        if (el) el.textContent = (stats.overall_avg_confidence * 100).toFixed(1) + '%';
+                    }
                 }
                 break;
-            case 3: // DITA转换层
-                if (data.conversion_stats) {
-                    const successRate = Math.round((data.conversion_stats.success_rate || 0) * 100);
-                    statsEl.innerHTML = `<span class="conversion-rate">成功率: <strong>${successRate}%</strong></span>`;
+
+            case 3: // Layer 3: DITA转换层
+                if (data.success !== undefined && data.total !== undefined) {
+                    const el = document.getElementById('layer3-dita-count');
+                    if (el) el.textContent = `${data.success}/${data.total}`;
+                }
+                if (data.total !== undefined) {
+                    const el = document.getElementById('layer3-total-count');
+                    if (el) el.textContent = data.total;
+                }
+                if (data.success_rate !== undefined) {
+                    const el = document.getElementById('layer3-success-rate');
+                    if (el) el.textContent = Math.round(data.success_rate * 100) + '%';
                 }
                 break;
-            case 4: // 质量保证层
-                if (data.quality_score) {
-                    const score = data.quality_score.overall || 0;
-                    statsEl.innerHTML = `<span class="quality-score">质量评分: <strong>${score}/100</strong></span>`;
+
+            case 4: // Layer 4: 质量保证层
+                if (data.avg_quality_score !== undefined) {
+                    const el = document.getElementById('layer4-quality-score');
+                    if (el) el.textContent = Math.round(data.avg_quality_score) + '/100';
+                }
+                if (data.success !== undefined) {
+                    const el = document.getElementById('layer4-success-count');
+                    if (el) el.textContent = data.success;
+                }
+                if (data.total !== undefined) {
+                    const el = document.getElementById('layer4-total-count');
+                    if (el) el.textContent = data.total;
                 }
                 break;
         }
@@ -365,7 +498,7 @@ class ConversionProcessor {
     }
 
     // 显示层结果文件
-    displayLayerResults(layer, layerData) {
+    async displayLayerResults(layer, layerData) {
         const resultsContainer = document.getElementById(`results-layer${layer}`);
         if (!resultsContainer) return;
 
@@ -376,91 +509,312 @@ class ConversionProcessor {
         switch (layer) {
             case 1:
                 // Layer 1: 预处理结果
-                this.displayPreprocessingResults(resultsContainer, layerData);
+                await this.displayPreprocessingResults(resultsContainer, layerData);
                 break;
             case 2:
                 // Layer 2: 语义分析结果
-                this.displaySemanticResults(resultsContainer, layerData);
+                await this.displaySemanticResults(resultsContainer, layerData);
                 break;
             case 3:
                 // Layer 3: DITA转换结果
-                this.displayDITAResults(resultsContainer, layerData);
+                await this.displayDITAResults(resultsContainer, layerData);
                 break;
             case 4:
                 // Layer 4: 质量保证结果
-                this.displayQualityResults(resultsContainer, layerData);
+                await this.displayQualityResults(resultsContainer, layerData);
                 break;
         }
     }
 
     // 显示预处理结果
-    displayPreprocessingResults(container, data) {
-        // Layer 1: 预处理结果 - 显示markdown文件
-        const fileItem = document.createElement('div');
-        fileItem.className = 'result-file-item';
-        fileItem.innerHTML = `
-            <div class="file-icon"><span class="material-icons">description</span></div>
-            <div class="file-info">
-                <div class="file-name">预处理后的Markdown</div>
-                <div class="file-size">${data.markdown_length ? this.formatFileSize(data.markdown_length) : '未知'}</div>
-            </div>
-            <div class="file-actions">
-                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer1'">下载</button>
-            </div>
-        `;
-        container.appendChild(fileItem);
+    async displayPreprocessingResults(container, data) {
+        // 获取文件列表
+        try {
+            const filesResponse = await fetch(`/api/layer/${this.sessionId}/layer1/files`);
+            const filesData = await filesResponse.json();
+            
+            if (filesData.success && filesData.files && filesData.files.length > 0) {
+                // 显示预览和下载按钮
+                const previewBtn = document.getElementById('preview-layer1');
+                const downloadBtn = document.getElementById('download-layer1');
+                if (previewBtn) previewBtn.style.display = 'inline-flex';
+                if (downloadBtn) downloadBtn.style.display = 'inline-flex';
+                
+                // 查找.md文件
+                const mdFiles = filesData.files.filter(f => f.name.endsWith('.md') || f.type === 'md' || f.type === 'markdown');
+                
+                if (mdFiles.length > 0) {
+                    // 如果有md文件，显示所有md文件
+                    mdFiles.forEach(file => {
+                        const fileItem = this.createFileItem(file, 'layer1');
+                        container.appendChild(fileItem);
+                    });
+                } else {
+                    // 如果没有md文件，显示所有文件
+                    filesData.files.forEach(file => {
+                        const fileItem = this.createFileItem(file, 'layer1');
+                        container.appendChild(fileItem);
+                    });
+                }
+            } else {
+                // 如果没有文件列表，显示默认项，尝试推断文件名
+                const fileItem = document.createElement('div');
+                fileItem.className = 'result-file-item';
+                
+                // 尝试从filename推断markdown文件名
+                let markdownFileName = null;
+                if (this.filename) {
+                    // 移除文件扩展名，添加.md
+                    const baseName = this.filename.replace(/\.[^/.]+$/, '');
+                    markdownFileName = `${baseName}.md`;
+                }
+                
+                // 添加预览按钮（使用推断的文件名或尝试第一个可能的文件名）
+                const previewBtn = markdownFileName ? `
+                    <button class="btn btn-sm btn-primary preview-btn" onclick="filePreviewer.preview('${this.sessionId}', 'layer1', '${markdownFileName}', '预处理后的Markdown').catch(err => { 
+                        console.error('预览失败:', err); 
+                        alert('预览失败: 文件不存在或路径错误');
+                    })">
+                        <i class="fas fa-eye"></i> 预览
+                    </button>
+                ` : '';
+                
+                fileItem.innerHTML = `
+                    <div class="file-icon"><i class="fas fa-file-alt"></i></div>
+                    <div class="file-info">
+                        <div class="file-name">预处理后的Markdown</div>
+                        <div class="file-size">${data.markdown_length ? this.formatFileSize(data.markdown_length) : '未知'}</div>
+                    </div>
+                    <div class="file-actions">
+                        ${previewBtn}
+                        <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer1'">下载</button>
+                    </div>
+                `;
+                container.appendChild(fileItem);
+            }
+        } catch (error) {
+            console.error('获取文件列表失败:', error);
+        }
     }
 
     // 显示语义分析结果
-    displaySemanticResults(container, data) {
-        // Layer 2: 语义分析结果 - 显示分块结果
-        const fileItem = document.createElement('div');
-        fileItem.className = 'result-file-item';
-        fileItem.innerHTML = `
-            <div class="file-icon"><span class="material-icons">category</span></div>
-            <div class="file-info">
-                <div class="file-name">语义分析结果 (${data.total_chunks || 0} 个分块)</div>
-            </div>
-            <div class="file-actions">
-                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer2'">下载</button>
-            </div>
-        `;
-        container.appendChild(fileItem);
+    async displaySemanticResults(container, data) {
+        try {
+            const filesResponse = await fetch(`/api/layer/${this.sessionId}/layer2/files`);
+            const filesData = await filesResponse.json();
+            
+            if (filesData.success && filesData.files.length > 0) {
+                // 显示预览和下载按钮
+                const previewBtn = document.getElementById('preview-layer2');
+                const downloadBtn = document.getElementById('download-layer2');
+                if (previewBtn) previewBtn.style.display = 'inline-flex';
+                if (downloadBtn) downloadBtn.style.display = 'inline-flex';
+                
+                filesData.files.forEach(file => {
+                    const fileItem = this.createFileItem(file, 'layer2');
+                    container.appendChild(fileItem);
+                });
+            } else {
+                // 如果没有文件列表，显示默认项，尝试预览常见的JSON文件
+                const fileItem = document.createElement('div');
+                fileItem.className = 'result-file-item';
+                
+                // 尝试预览layer2_result.json
+                const previewBtn = `
+                    <button class="btn btn-sm btn-primary preview-btn" onclick="filePreviewer.preview('${this.sessionId}', 'layer2', 'layer2_result.json', '语义分析结果').catch(err => { 
+                        console.error('预览失败:', err); 
+                    })">
+                        <i class="fas fa-eye"></i> 预览
+                    </button>
+                `;
+                
+                fileItem.innerHTML = `
+                    <div class="file-icon"><i class="fas fa-brain"></i></div>
+                    <div class="file-info">
+                        <div class="file-name">语义分析结果 (${data.total_chunks || 0} 个分块)</div>
+                    </div>
+                    <div class="file-actions">
+                        ${previewBtn}
+                        <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer2'">下载</button>
+                    </div>
+                `;
+                container.appendChild(fileItem);
+            }
+        } catch (error) {
+            console.error('获取文件列表失败:', error);
+        }
     }
 
     // 显示DITA转换结果
-    displayDITAResults(container, data) {
-        // Layer 3: DITA转换结果 - 显示DITA文件
-        const fileItem = document.createElement('div');
-        fileItem.className = 'result-file-item';
-        fileItem.innerHTML = `
-            <div class="file-icon"><span class="material-icons">code</span></div>
-            <div class="file-info">
-                <div class="file-name">DITA转换结果 (${data.success || 0} 个成功)</div>
-            </div>
-            <div class="file-actions">
-                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer3'">下载</button>
-            </div>
-        `;
-        container.appendChild(fileItem);
+    async displayDITAResults(container, data) {
+        try {
+            const filesResponse = await fetch(`/api/layer/${this.sessionId}/layer3/files`);
+            const filesData = await filesResponse.json();
+            
+            if (filesData.success && filesData.files.length > 0) {
+                // 显示预览和下载按钮
+                const previewBtn = document.getElementById('preview-layer3');
+                const downloadBtn = document.getElementById('download-layer3');
+                if (previewBtn) previewBtn.style.display = 'inline-flex';
+                if (downloadBtn) downloadBtn.style.display = 'inline-flex';
+                
+                filesData.files.forEach(file => {
+                    const fileItem = this.createFileItem(file, 'layer3');
+                    container.appendChild(fileItem);
+                });
+            } else {
+                // 如果没有文件列表，显示默认项，尝试预览全部
+                const fileItem = document.createElement('div');
+                fileItem.className = 'result-file-item';
+                
+                // DITA文件通常有多个，使用预览全部功能
+                const previewBtn = `
+                    <button class="btn btn-sm btn-primary preview-btn" onclick="if(window.processor) window.processor.previewLayerAll(3)">
+                        <i class="fas fa-eye"></i> 预览
+                    </button>
+                `;
+                
+                fileItem.innerHTML = `
+                    <div class="file-icon"><i class="fas fa-code"></i></div>
+                    <div class="file-info">
+                        <div class="file-name">DITA转换结果 (${data.success || 0} 个成功)</div>
+                    </div>
+                    <div class="file-actions">
+                        ${previewBtn}
+                        <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer3'">下载</button>
+                    </div>
+                `;
+                container.appendChild(fileItem);
+            }
+        } catch (error) {
+            console.error('获取文件列表失败:', error);
+        }
     }
 
     // 显示质量保证结果
-    displayQualityResults(container, data) {
-        // Layer 4: 质量保证结果 - 显示质量评估报告
+    async displayQualityResults(container, data) {
+        try {
+            const filesResponse = await fetch(`/api/layer/${this.sessionId}/layer4/files`);
+            const filesData = await filesResponse.json();
+            
+            if (filesData.success && filesData.files.length > 0) {
+                // 显示预览和下载按钮
+                const previewBtn = document.getElementById('preview-layer4');
+                const downloadBtn = document.getElementById('download-layer4');
+                if (previewBtn) previewBtn.style.display = 'inline-flex';
+                if (downloadBtn) downloadBtn.style.display = 'inline-flex';
+                
+                filesData.files.forEach(file => {
+                    const fileItem = this.createFileItem(file, 'layer4');
+                    container.appendChild(fileItem);
+                });
+            } else {
+                // 如果没有文件列表，显示默认项，尝试预览质量报告JSON文件
+                const fileItem = document.createElement('div');
+                fileItem.className = 'result-file-item';
+                
+                // 尝试预览layer4_result.json或quality_report.json
+                const previewBtn = `
+                    <button class="btn btn-sm btn-primary preview-btn" onclick="filePreviewer.preview('${this.sessionId}', 'layer4', 'layer4_result.json', '质量评估报告').catch(() => filePreviewer.preview('${this.sessionId}', 'layer4', 'quality_report.json', '质量评估报告')).catch(err => { 
+                        console.error('预览失败:', err); 
+                    })">
+                        <i class="fas fa-eye"></i> 预览
+                    </button>
+                `;
+                
+                fileItem.innerHTML = `
+                    <div class="file-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="file-info">
+                        <div class="file-name">质量评估报告</div>
+                        <div class="file-size">${data.total ? this.formatFileSize(data.total) : '未知'}</div>
+                    </div>
+                    <div class="file-actions">
+                        ${previewBtn}
+                        <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer4'">下载</button>
+                    </div>
+                `;
+                container.appendChild(fileItem);
+            }
+        } catch (error) {
+            console.error('获取文件列表失败:', error);
+        }
+    }
+    
+    // 创建文件项（带预览按钮）
+    createFileItem(file, layer) {
         const fileItem = document.createElement('div');
         fileItem.className = 'result-file-item';
+        
+        // 根据文件类型选择图标
+        let icon = 'fa-file';
+        if (file.type === 'dita' || file.type === 'xml') {
+            icon = 'fa-code';
+        } else if (file.type === 'json') {
+            icon = 'fa-file-code';
+        } else if (file.type === 'md' || file.type === 'markdown') {
+            icon = 'fa-file-alt';
+        } else if (['png', 'jpg', 'jpeg', 'gif'].includes(file.type)) {
+            icon = 'fa-image';
+        }
+        
+        const canPreview = ['dita', 'xml', 'json', 'md', 'markdown', 'png', 'jpg', 'jpeg', 'gif'].includes(file.type);
+        
+        // 转义文件路径和文件名，防止XSS，同时规范化路径（统一为正斜杠用于URL）
+        const normalizedPath = file.path.replace(/\\/g, '/'); // Windows路径转URL路径
+        const escapedPath = normalizedPath.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const escapedName = file.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        
         fileItem.innerHTML = `
-            <div class="file-icon"><span class="material-icons">check_circle</span></div>
+            <div class="file-icon"><i class="fas ${icon}"></i></div>
             <div class="file-info">
-                <div class="file-name">质量评估报告</div>
-                <div class="file-size">${data.total ? this.formatFileSize(data.total) : '未知'}</div>
+                <div class="file-name">${escapedName}</div>
+                <div class="file-size">${this.formatFileSize(file.size)}</div>
             </div>
             <div class="file-actions">
-                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/layer4'">下载</button>
+                ${canPreview ? `<button class="btn btn-sm btn-primary preview-btn" onclick="filePreviewer.preview('${this.sessionId}', '${layer}', '${escapedPath}', '${escapedName}')">
+                    <i class="fas fa-eye"></i> 预览
+                </button>` : ''}
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='/api/download/layer/${this.sessionId}/${layer}'">下载</button>
             </div>
         `;
-        container.appendChild(fileItem);
+        return fileItem;
+    }
+
+    // 预览整个Layer的所有文件
+    async previewLayerAll(layer) {
+        try {
+            // 获取该layer的所有文件
+            const filesResponse = await fetch(`/api/layer/${this.sessionId}/layer${layer}/files`);
+            const filesData = await filesResponse.json();
+            
+            if (!filesData.success || !filesData.files || filesData.files.length === 0) {
+                alert('该层没有可预览的文件');
+                return;
+            }
+            
+            // 过滤出可预览的文件
+            const previewableFiles = filesData.files.filter(file => {
+                const fileType = file.type.toLowerCase();
+                return ['dita', 'xml', 'json', 'md', 'markdown', 'png', 'jpg', 'jpeg', 'gif'].includes(fileType);
+            });
+            
+            if (previewableFiles.length === 0) {
+                alert('该层没有可预览的文件类型');
+                return;
+            }
+            
+            // 调用预览组件的预览全部功能
+            if (typeof filePreviewer !== 'undefined' && filePreviewer.previewLayerAll) {
+                filePreviewer.previewLayerAll(this.sessionId, `layer${layer}`, previewableFiles, `Layer ${layer} 全部结果`);
+            } else {
+                // 如果预览组件不支持预览全部，则预览第一个文件
+                const firstFile = previewableFiles[0];
+                filePreviewer.preview(this.sessionId, `layer${layer}`, firstFile.path, firstFile.name);
+            }
+        } catch (error) {
+            console.error(`预览Layer ${layer}失败:`, error);
+            alert(`预览失败: ${error.message}`);
+        }
     }
 
     // 下载文件

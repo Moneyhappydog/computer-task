@@ -135,6 +135,10 @@ class TemplateRenderer:
         allowed_tags = [
             r'<table[^>]*>[\s\S]*?</table>',  # table标签（必须先匹配，包含换行）
             r'<fig[^>]*>[\s\S]*?</fig>',  # figure标签（必须先匹配，包含换行）
+            r'<p>.*?</p>',  # p标签（段落标签，必须在table和fig之后匹配）
+            r'<codeblock[^>]*>[\s\S]*?</codeblock>',  # codeblock标签（用于公式）
+            r'<equation-inline>.*?</equation-inline>',  # 行内公式标签
+            r'<equation-block>[\s\S]*?</equation-block>',  # 块级公式标签
             r'<tgroup[^>]*>[\s\S]*?</tgroup>',  # tgroup标签
             r'<thead>[\s\S]*?</thead>',  # thead标签
             r'<tbody>[\s\S]*?</tbody>',  # tbody标签

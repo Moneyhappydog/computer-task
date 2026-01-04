@@ -8,8 +8,8 @@
     <!-- CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Font Awesome - 使用 jsDelivr CDN (更稳定，不受跟踪防护影响) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     
     {% block extra_css %}{% endblock %}
 </head>
@@ -24,6 +24,9 @@
             <div class="navbar-menu">
                 <a href="/" class="nav-item">
                     <i class="fas fa-home"></i> 主页
+                </a>
+                <a href="/repair" class="nav-item">
+                    <i class="fas fa-tools"></i> 手动修复
                 </a>
             </div>
         </div>

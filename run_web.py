@@ -22,6 +22,10 @@ def setup_logging(log_level):
     Args:
         log_level: 日志级别
     """
+    # 确保 logs 目录存在
+    log_dir = Path('logs')
+    log_dir.mkdir(parents=True, exist_ok=True)
+    
     logging.basicConfig(
         level=getattr(logging, log_level.upper()),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

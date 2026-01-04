@@ -207,6 +207,48 @@
     color: #2c3e50;
 }
 
+.layer-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.layer-action-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    border: none;
+}
+
+.layer-preview-btn {
+    background: #667eea;
+    color: white;
+}
+
+.layer-preview-btn:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.layer-download-btn {
+    background: #00d4aa;
+    color: white;
+}
+
+.layer-download-btn:hover {
+    background: #00b894;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 212, 170, 0.3);
+}
+
 /* 结果文件展示 */
 .layer-results {
     margin-top: 20px;
@@ -216,6 +258,12 @@
 
 .results-header {
     margin-bottom: 15px;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .results-header h4 {
@@ -230,6 +278,31 @@
 .results-header h4::before {
     content: "📂";
     font-size: 1.2rem;
+}
+
+.layer-preview-all-btn {
+    padding: 6px 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.layer-preview-all-btn:hover {
+    background: #5568d3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.layer-preview-all-btn i {
+    font-size: 0.9rem;
 }
 
 .results-list {
@@ -270,6 +343,8 @@
 
 .file-info {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .file-name {
@@ -277,6 +352,9 @@
     font-weight: 500;
     color: #3a3f51;
     margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .file-size {
@@ -287,6 +365,33 @@
 .file-actions {
     display: flex;
     gap: 8px;
+    align-items: center;
+}
+
+.preview-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: none;
+    background-color: #667eea;
+    color: white;
+}
+
+.preview-btn:hover {
+    background-color: #5a52e6;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.preview-btn i {
+    font-size: 0.9rem;
 }
 
 .btn-sm {
@@ -639,7 +744,18 @@
             <p><strong>预处理</strong></p>
             <p>文档解析与结构提取</p>
             <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                <span class="file-type">文件类型: <strong>--</strong></span>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <span class="file-type">文件类型: <strong id="layer1-file-type">--</strong></span>
+                    <span class="text-length">文本长度: <strong id="layer1-text-length">--</strong></span>
+                </div>
+            </div>
+            <div class="layer-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                <button class="layer-action-btn layer-preview-btn" id="preview-layer1" onclick="if(window.processor) window.processor.previewLayerAll(1)" style="display: none;">
+                    <i class="fas fa-eye"></i> 预览
+                </button>
+                <a class="layer-action-btn layer-download-btn" id="download-layer1" href="#" onclick="event.preventDefault(); if(window.processor) window.location.href='/api/download/layer/' + window.processor.sessionId + '/layer1';" style="display: none;">
+                    <i class="fas fa-download"></i> 下载
+                </a>
             </div>
         </div>
         <!-- 结果文件展示区域 -->
@@ -675,7 +791,19 @@
             <p><strong>语义分析</strong></p>
             <p>AI驱动的内容分类</p>
             <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                <span class="chunk-count">分块数量: <strong>--</strong></span>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <span class="chunk-count">分块数量: <strong id="layer2-chunk-count">--</strong></span>
+                    <span class="type-dist">类型分布: <strong id="layer2-type-dist">--</strong></span>
+                    <span class="confidence">平均置信度: <strong id="layer2-confidence">--</strong></span>
+                </div>
+            </div>
+            <div class="layer-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                <button class="layer-action-btn layer-preview-btn" id="preview-layer2" onclick="if(window.processor) window.processor.previewLayerAll(2)" style="display: none;">
+                    <i class="fas fa-eye"></i> 预览
+                </button>
+                <a class="layer-action-btn layer-download-btn" id="download-layer2" href="#" onclick="event.preventDefault(); if(window.processor) window.location.href='/api/download/layer/' + window.processor.sessionId + '/layer2';" style="display: none;">
+                    <i class="fas fa-download"></i> 下载
+                </a>
             </div>
         </div>
         <!-- 结果文件展示区域 -->
@@ -711,7 +839,19 @@
             <p><strong>DITA转换</strong></p>
             <p>生成标准DITA XML</p>
             <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                <span class="conversion-rate">成功率: <strong>--</strong></span>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <span class="conversion-rate">成功率: <strong id="layer3-success-rate">--</strong></span>
+                    <span class="dita-count">DITA文件: <strong id="layer3-dita-count">--</strong></span>
+                    <span class="total-count">总数: <strong id="layer3-total-count">--</strong></span>
+                </div>
+            </div>
+            <div class="layer-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                <button class="layer-action-btn layer-preview-btn" id="preview-layer3" onclick="if(window.processor) window.processor.previewLayerAll(3)" style="display: none;">
+                    <i class="fas fa-eye"></i> 预览
+                </button>
+                <a class="layer-action-btn layer-download-btn" id="download-layer3" href="#" onclick="event.preventDefault(); if(window.processor) window.location.href='/api/download/layer/' + window.processor.sessionId + '/layer3';" style="display: none;">
+                    <i class="fas fa-download"></i> 下载
+                </a>
             </div>
         </div>
         <!-- 结果文件展示区域 -->
@@ -747,7 +887,19 @@
             <p><strong>质量保证</strong></p>
             <p>验证与优化</p>
             <div class="layer-stats" style="margin-top: 0.5rem; font-size: 0.8rem; color: #666;">
-                <span class="quality-score">质量评分: <strong>--</strong></span>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <span class="quality-score">质量评分: <strong id="layer4-quality-score">--</strong></span>
+                    <span class="success-count">成功: <strong id="layer4-success-count">--</strong></span>
+                    <span class="total-count">总数: <strong id="layer4-total-count">--</strong></span>
+                </div>
+            </div>
+            <div class="layer-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                <button class="layer-action-btn layer-preview-btn" id="preview-layer4" onclick="if(window.processor) window.processor.previewLayerAll(4)" style="display: none;">
+                    <i class="fas fa-eye"></i> 预览
+                </button>
+                <a class="layer-action-btn layer-download-btn" id="download-layer4" href="#" onclick="event.preventDefault(); if(window.processor) window.location.href='/api/download/layer/' + window.processor.sessionId + '/layer4';" style="display: none;">
+                    <i class="fas fa-download"></i> 下载
+                </a>
             </div>
         </div>
         <!-- 结果文件展示区域 -->
@@ -794,5 +946,6 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/preview.js') }}"></script>
 <script src="{{ url_for('static', filename='js/process.js') }}"></script>
 {% endblock %}

@@ -173,15 +173,14 @@ class ContentStructurer:
     # ========== LLM Prompt构建 ==========
     
     def _build_task_prompt(self, content: str, title: str) -> str:
-        """构建Task结构化提示词"""
-        return f"""提取以下Task内容的结构化信息。
+        return f"""你将把输入内容结构化为符合 DITA 片段规范的 JSON。只输出 JSON，不要输出任何解释文字、不要 Markdown、不要代码围栏。
 
 标题: {title}
 
 内容:
 {content}
 
-请输出JSON格式（不要有其他说明文字）:
+=== 输出 JSON（严格遵循；缺失字段就省略） ===
 {{
   "title": "任务标题",
   "short_description": "简短描述（可选）",
@@ -189,95 +188,202 @@ class ContentStructurer:
   "context": "背景说明（可选）",
   "steps": [
     {{
-      "cmd": "步骤的主要操作",
-      "info": "步骤的补充说明（可选）",
-      "example": "示例（可选）"
+      "cmd": "明确的操作指令（必须是动作）",
+      "info": "可选：DITA片段（见下方语法）",
+      "example": "可选：DITA片段（见下方语法）"
     }}
   ],
   "result": "预期结果（可选）",
-  "example": "完整示例（可选）"
+  "example": "完整示例（可选，DITA片段语法同上）"
 }}
 
-注意:
-1. 每个步骤的cmd必须是明确的操作指令
-2. steps至少包含1个步骤
-3. 如果没有某个字段的信息就省略
+=== DITA 片段语法（适用于 info / example 等字符串字段，必须严格遵守） ===
+你输出的字符串只能由以下“单元”拼接而成：
+1) 段落单元（只能包含纯文本 + 行内公式）：
+   <p>...文本...<equation-inline>LaTeX</equation-inline>...文本...</p>
+2) 块单元（必须独立成段，不能在 <p> 内）：
+   - 公式块：<codeblock outputclass="math">纯净LaTeX</codeblock>
+   - 表格块：<table><title>...</title><tgroup cols="N">...</tgroup></table>
+   - 图片块：<fig><title>...</title><image href="..." alt="..."/></fig>
+
+拼接格式只能是：单元之间用两个换行分隔：
+<p>...</p>\\n\\n<codeblock ...>...</codeblock>\\n\\n<p>...</p>
+
+硬性禁止：
+- 禁止 <p><p> 嵌套
+- 禁止 <table>/<fig>/<codeblock> 出现在 <p> 内
+- 禁止把块单元与文本写在同一行（块单元前后必须是 \\n\\n）
+
+=== 图片规则（必须执行） ===
+- 每个 <fig> 必须同时满足：
+  - <title> 非空：无法识别则用 "Caption unavailable (OCR)"
+  - alt 非空：无法识别则用 "Figure"
+- href：
+  - 若路径不确定或文件不一定存在：用 href="MISSING_ASSET/<expected_filename>.png"
+  - expected_filename 规则：优先使用输入里出现的文件名；否则用 "page_<page>_image_<idx>.png"；再不行用 "unknown.png"
+
+=== 表格规则（必须执行） ===
+- 仅当“至少2列 且 至少2行数据”才输出 <table>；否则改写为段落或列表（但列表也要放在 <p> 里描述，不要伪表）。
+- 列数归一化算法（必须照做）：
+  1) 计算所有行的最大列数 = N（包括表头行与数据行）
+  2) tgroup cols="N"
+  3) 每一行的 entry 数必须等于 N：不足补空字符串；超过则把多余内容合并到最后一列并用分号隔开
+
+=== 公式规则（必须执行） ===
+- 行内公式：只用 <equation-inline>，且一个公式只能一个标签，禁止拆分。
+- 块公式：只用 <codeblock outputclass="math">，并且 LaTeX 必须纯净：
+  - 不允许出现 &amp; &lt; &gt; 等 HTML 实体（必须反转义）
+  - 不允许输出 "..." 作为公式内容；无法识别则输出 "MISSING_EQUATION"
+- 若正文出现“(1)(2)...”引用：块公式尽量用 \\tag{{n}} 保留编号；无法恢复则在公式内容末尾写 "% missing tag n"（作为LaTeX注释）并仍输出 MISSING_EQUATION。
+
+=== 输出前自检（必须完成后再输出） ===
+检查你输出 JSON 中所有字符串字段：
+1) 是否出现 "<p><p>" 或 "<p>...<table>" 或 "<p>...<fig>" 或 "<p>...<codeblock" ？若有，必须改为按语法拆分并用 \\n\\n 分隔。
+2) 是否有 <fig> 的 title/alt 为空？若有，补占位文本。
+3) 是否有表格 cols 与行 entry 数不一致？按归一化算法修复。
+4) 是否有公式包含 HTML 实体或 "..."？清洗或改为 MISSING_EQUATION。
+现在输出最终 JSON。
 """
-    
+
     def _build_concept_prompt(self, content: str, title: str) -> str:
-        """构建Concept结构化提示词"""
-        return f"""提取以下Concept内容的结构化信息。
+        return f"""你将把输入内容结构化为符合 DITA 片段规范的 JSON。只输出 JSON，不要输出任何解释文字、不要 Markdown、不要代码围栏。
 
 标题: {title}
 
 内容:
 {content}
 
-请输出JSON格式（不要有其他说明文字）:
+=== 输出 JSON（严格遵循；缺失字段就省略） ===
 {{
   "title": "概念标题",
   "short_description": "简短描述（可选）",
-  "introduction": "引言",
-  "definition": "定义（如果有明确定义）",
+  "introduction": "引言（可选，可使用DITA片段语法）",
+  "definition": "定义（可选，可使用DITA片段语法）",
   "sections": [
     {{
       "id": "section_1",
       "title": "章节标题（可选）",
-      "content": "章节内容",
-      "example": "示例（可选）"
+      "content": "DITA片段（必须遵守下方语法）",
+      "example": "可选：DITA片段"
     }}
   ],
-  "note": "注意事项（可选）"
+  "note": "注意事项（可选，可使用DITA片段语法）"
 }}
 
-注意:
-1. introduction是核心概念的介绍
-2. sections包含详细说明的各个方面
-3. 如果内容中有明确的定义部分，提取到definition字段
+=== DITA 片段语法（适用于 introduction/definition/sections[].content/example/note） ===
+允许的单元只有两类：
+1) 段落单元：<p>纯文本 + 行内公式</p>
+2) 块单元：<fig>...</fig> 或 <table>...</table> 或 <codeblock outputclass="math">...</codeblock>
+
+拼接规则：单元之间必须用 \\n\\n 分隔，块单元必须独立成段。
+严禁：
+- <p><p> 嵌套
+- 块单元在 <p> 内
+- 块单元与文本同一行
+
+=== 公式规则（最高优先级） ===
+- 行内：<equation-inline>LaTeX</equation-inline>（一个公式一个标签，禁止拆分）
+- 块级：<codeblock outputclass="math">纯净LaTeX</codeblock>（必须独立成段）
+- LaTeX 清洗：必须反转义 HTML 实体（&amp;→&, &lt;→<, &gt;→>），禁止出现 "..."
+- 编号：若你在输入中识别到 (1)(2)(3)... 序列引用：
+  - 尽量在块公式 LaTeX 末尾保留 \\tag{{n}}
+  - 若发现缺号，必须在 JSON 顶层增加：
+    "missing_equation_tags": [缺失编号列表]
+
+=== 表格规则（严格校验 + 归一化） ===
+- 仅当 ≥2列 且 ≥2行数据 才输出 <table>；否则输出为段落描述，禁止伪表。
+- 列数归一化算法（必须照做）：
+  - N = 所有行最大列数
+  - tgroup cols="N"
+  - 每行 entry 数必须= N，不足补空，超出合并入最后一列
+- title 必须非空：无法识别则用 "Table (OCR)"
+
+=== 图片规则（完整性） ===
+- 每个 fig 必须：
+  - <title> 非空：无法识别则 "Caption unavailable (OCR)"
+  - alt 非空：无法识别则 "Figure"
+- href：若不确定存在，用 href="MISSING_ASSET/<expected_filename>.png"
+- 若有多张图，按出现顺序输出，尽量保持 Figure 编号一致。
+
+=== 输出前自检（必须完成） ===
+对所有 DITA 片段字段执行检查与修复：
+1) 不得出现 "<p><p>"；不得出现 "<p>...<table/fig/codeblock"
+2) 所有块单元必须前后都有 \\n\\n
+3) 表格 cols 与 entry 数一致
+4) 公式无 HTML 实体且不为 "..."
+现在输出最终 JSON。
 """
+
     
     def _build_reference_prompt(self, content: str, title: str) -> str:
-        """构建Reference结构化提示词"""
-        return f"""提取以下Reference内容的结构化信息。
+        return f"""你将把输入内容结构化为符合 DITA 片段规范的 JSON。只输出 JSON，不要输出任何解释文字、不要 Markdown、不要代码围栏。
 
 标题: {title}
 
 内容:
 {content}
 
-请输出JSON格式（不要有其他说明文字）:
+=== 输出 JSON（严格遵循；缺失字段就省略） ===
 {{
   "title": "参考标题",
   "short_description": "简短描述（可选）",
-  "introduction": "引言（可选）",
+  "introduction": "可选：DITA片段",
   "properties": [
     {{
       "name": "属性名",
       "value": "属性值",
-      "description": "描述"
+      "description": "描述（可选）"
     }}
   ],
   "table": {{
-    "columns": ["列1", "列2", "列3"],
+    "columns": ["列1", "列2"],
     "rows": [
-      ["单元格1", "单元格2", "单元格3"],
-      ["单元格4", "单元格5", "单元格6"]
+      ["A", "B"]
     ]
   }},
   "sections": [
     {{
       "id": "section_1",
       "title": "章节标题（可选）",
-      "content": "章节内容"
+      "content": "DITA片段（必须遵守下方语法）"
     }}
   ]
 }}
 
-注意:
-1. properties用于参数列表、配置项等
-2. table用于表格数据
-3. 根据实际内容选择使用properties或table或都使用
+=== 语言规则 ===
+保持原文语言，不要翻译。
+
+=== DITA 片段语法（适用于 introduction/sections[].content 等字符串） ===
+- 段落单元：<p>纯文本 + 行内公式</p>
+- 块单元：<fig>...</fig> / <table>...</table> / <codeblock outputclass="math">...</codeblock>
+- 单元之间必须 \\n\\n 分隔
+- 严禁：<p><p> 嵌套；严禁块单元在 <p> 内
+
+=== 公式规则 ===
+- 行内：<equation-inline>LaTeX</equation-inline>（不可拆分）
+- 块级：<codeblock outputclass="math">纯净LaTeX</codeblock>（必须独立成段）
+- 必须反转义 HTML 实体；禁止输出 "..."；无法识别则 "MISSING_EQUATION"
+
+=== 表格规则 ===
+- 若内容是“参数表/配置表”类：优先填充 JSON 的 table 字段（columns/rows），并确保每行列数一致。
+- 若必须在 content 中输出 DITA 表：
+  - 仅当 ≥2列且≥2行数据
+  - 使用 <table><title>...</title><tgroup cols="N">...</tgroup></table>
+  - title 非空：无法识别则 "Table (OCR)"
+  - cols/entry 数必须一致（不足补空，超出合并入最后列）
+
+=== 图片规则 ===
+- fig 格式：<fig><title>...</title><image href="..." alt="..."/></fig>
+- title/alt 必须非空
+- 路径不确定：href="MISSING_ASSET/<expected_filename>.png"
+
+=== 输出前自检 ===
+1) DITA 片段字段是否存在嵌套 p 或块在 p 内？修复为按单元拆分 + \\n\\n
+2) 表格列数一致性
+3) 公式是否纯净、非 "..."
+现在输出最终 JSON。
 """
+
     
     # ========== 响应解析 ==========
     

@@ -77,7 +77,8 @@ class ProcessingPipeline:
             self._update_progress(progress_callback, 'layer1', 100, {
                 'message': '✅ 预处理完成',
                 'markdown_length': len(markdown_content),
-                'file_type': layer1_result['file_type']
+                'file_type': layer1_result.get('file_type', 'unknown'),
+                'confidence': layer1_result.get('confidence', 0.0)
             })
             
             # ========== Layer 2: 语义分析 ==========
@@ -117,7 +118,8 @@ class ProcessingPipeline:
             self._update_progress(progress_callback, 'layer2', 100, {
                 'message': '✅ 语义分析完成',
                 'total_chunks': len(chunks),
-                'type_distribution': layer2_result['statistics']['type_distribution']
+                'type_distribution': layer2_result['statistics'].get('type_distribution', {}),
+                'overall_avg_confidence': layer2_result['statistics'].get('overall_avg_confidence', 0.0)
             })
             
             # ========== Layer 3: DITA转换 ==========
@@ -152,7 +154,10 @@ class ProcessingPipeline:
             
             self._update_progress(progress_callback, 'layer3', 100, {
                 'message': f'✅ DITA转换完成 ({layer3_result["success"]}/{layer3_result["total"]})',
-                'success_count': layer3_result['success']
+                'success_count': layer3_result['success'],
+                'total': layer3_result['total'],
+                'failed': layer3_result['failed'],
+                'success_rate': layer3_result['success_rate']
             })
             
             # ========== Layer 4: 质量保证 ==========
@@ -211,13 +216,19 @@ class ProcessingPipeline:
                 
                 self._update_progress(progress_callback, 'layer4', 100, {
                     'message': f'✅ 质量保证完成 ({layer4_result["success"]}/{layer4_result["total"]})',
-                    'avg_quality': layer4_result['summary']['quality_scores']['avg_overall_quality']
+                    'avg_quality': layer4_result['summary']['quality_scores']['avg_overall_quality'],
+                    'total': layer4_result['total'],
+                    'success': layer4_result['success'],
+                    'failed': layer4_result['failed']
                 })
             else:
                 # 没有可处理的DITA文档
                 self._update_progress(progress_callback, 'layer4', 100, {
                     'message': '✅ 质量保证完成 (无DITA文档可处理)',
-                    'avg_quality': 0.0
+                    'avg_quality': 0.0,
+                    'total': 0,
+                    'success': 0,
+                    'failed': 0
                 })
                 
                 result['layers']['layer4'] = {

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 import logging
 import json
+import re
 from datetime import datetime
 
 from .template_selector import TemplateSelector
@@ -371,7 +372,33 @@ class DITAConverter:
         results = []
         success_count = 0
         
+        # 过滤出需要跳过的References chunks（由专用模块处理）
+        references_chunks = []
+        regular_chunks = []
+        
         for i, chunk in enumerate(chunks, 1):
+            chunk_title = chunk.get('title', '').strip()
+            chunk_type = chunk.get('type', '').strip()
+            
+            # 检测References chunk：标题包含"References"或类型为"Reference"且标题匹配
+            is_references = (
+                (chunk_type.lower() == 'reference' and 
+                 re.search(r'\bReferences?\b', chunk_title, re.IGNORECASE) is not None) or
+                re.match(r'^References?\s*$', chunk_title, re.IGNORECASE) is not None
+            )
+            
+            if is_references:
+                references_chunks.append((i, chunk))
+                logger.info(f"\n[{i}/{len(chunks)}] ⏭️  跳过References chunk（将由专用模块处理）: {chunk_title}")
+            else:
+                regular_chunks.append((i, chunk))
+        
+        if references_chunks:
+            logger.info(f"\n📚 检测到 {len(references_chunks)} 个References chunks，将由专用提取模块处理")
+            logger.info(f"   常规chunks数量: {len(regular_chunks)}")
+        
+        # 只处理常规chunks
+        for i, chunk in regular_chunks:
             logger.info(f"\n[{i}/{len(chunks)}] 处理: {chunk.get('title', 'Untitled')}")
             
             result = self.convert(
@@ -389,6 +416,16 @@ class DITAConverter:
                 # 保存到文件
                 if output_dir:
                     self._save_dita_file(result, output_dir, i)
+        
+        # 为跳过的References chunks添加占位结果
+        for i, chunk in references_chunks:
+            results.append({
+                'success': False,
+                'title': chunk.get('title', 'References'),
+                'content_type': 'Reference',
+                'error': 'Skipped: 由专用References提取模块处理',
+                'skipped': True
+            })
         
         # 生成批量报告
         batch_result = {

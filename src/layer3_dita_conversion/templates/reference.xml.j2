@@ -32,28 +32,66 @@
     {% endif %}
     
     {% if table %}
-    <section>
-      <table>
-        <tgroup cols="{{ table.columns|length }}">
-          <thead>
-            <row>
-              {% for col in table.columns %}
-              <entry>{{ col }}</entry>
-              {% endfor %}
-            </row>
-          </thead>
-          <tbody>
-            {% for row in table.rows %}
-            <row>
-              {% for cell in row %}
-              <entry>{{ cell }}</entry>
-              {% endfor %}
-            </row>
-            {% endfor %}
-          </tbody>
-        </tgroup>
-      </table>
-    </section>
+      {# 支持两种格式：数组（多个表格）或对象（单个表格） #}
+      {% if table is mapping %}
+        {# table是对象（单个表格） #}
+        {% set cols_count = table.columns|length if table.columns else (table.rows[0]|length if table.rows and table.rows[0] else 0) %}
+        <section>
+          <table>
+            {% if table.title %}<title>{{ table.title }}</title>{% endif %}
+            <tgroup cols="{{ cols_count }}">
+              {% if table.columns and table.columns|length > 0 %}
+              <thead>
+                <row>
+                  {% for col in table.columns %}
+                  <entry>{{ col }}</entry>
+                  {% endfor %}
+                </row>
+              </thead>
+              {% endif %}
+              <tbody>
+                {% for row in table.rows %}
+                <row>
+                  {% for cell in row %}
+                  <entry>{{ cell }}</entry>
+                  {% endfor %}
+                </row>
+                {% endfor %}
+              </tbody>
+            </tgroup>
+          </table>
+        </section>
+      {% elif table is iterable and table is not string %}
+        {# table是数组（多个表格） #}
+        {% for tbl in table %}
+          {% set cols_count = tbl.columns|length if tbl.columns else (tbl.rows[0]|length if tbl.rows and tbl.rows[0] else 0) %}
+          <section>
+            <table>
+              {% if tbl.title %}<title>{{ tbl.title }}</title>{% endif %}
+              <tgroup cols="{{ cols_count }}">
+                {% if tbl.columns and tbl.columns|length > 0 %}
+                <thead>
+                  <row>
+                    {% for col in tbl.columns %}
+                    <entry>{{ col }}</entry>
+                    {% endfor %}
+                  </row>
+                </thead>
+                {% endif %}
+                <tbody>
+                  {% for row in tbl.rows %}
+                  <row>
+                    {% for cell in row %}
+                    <entry>{{ cell }}</entry>
+                    {% endfor %}
+                  </row>
+                  {% endfor %}
+                </tbody>
+              </tgroup>
+            </table>
+          </section>
+        {% endfor %}
+      {% endif %}
     {% endif %}
     
     {% for section in sections %}

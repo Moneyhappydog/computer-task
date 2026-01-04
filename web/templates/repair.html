@@ -1,0 +1,540 @@
+{% extends "base.html" %}
+
+{% block title %}手动修复DITA包{% endblock %}
+
+{% block extra_css %}
+<style>
+    .repair-container {
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .page-header {
+        text-align: center;
+        margin-bottom: 3rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .page-header h1 {
+        margin: 0 0 0.5rem 0;
+        font-size: 2.5rem;
+        font-weight: 700;
+    }
+    
+    .page-header p {
+        margin: 0;
+        font-size: 1.1rem;
+        opacity: 0.95;
+    }
+    
+    .upload-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .upload-card h2 {
+        margin-top: 0;
+        color: #333;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .upload-card h2 i {
+        color: #667eea;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        color: #555;
+        font-size: 1rem;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .form-text {
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        color: #888;
+    }
+    
+    .form-check {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        transition: background 0.2s ease;
+    }
+    
+    .form-check:hover {
+        background: #e9ecef;
+    }
+    
+    .form-check-input {
+        width: 20px;
+        height: 20px;
+        margin-right: 0.75rem;
+        cursor: pointer;
+        accent-color: #667eea;
+    }
+    
+    .form-check-label {
+        cursor: pointer;
+        user-select: none;
+        flex: 1;
+        color: #555;
+        font-size: 0.95rem;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.875rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
+    
+    .result-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-top: 2rem;
+        overflow: hidden;
+    }
+    
+    .result-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.25rem 2rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+    
+    .result-body {
+        padding: 2rem;
+    }
+    
+    .alert {
+        padding: 1.25rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        border-left: 4px solid;
+    }
+    
+    .alert-success {
+        background: #d4edda;
+        border-color: #28a745;
+        color: #155724;
+    }
+    
+    .alert-danger {
+        background: #f8d7da;
+        border-color: #dc3545;
+        color: #721c24;
+    }
+    
+    .alert-warning {
+        background: #fff3cd;
+        border-color: #ffc107;
+        color: #856404;
+    }
+    
+    .alert h6 {
+        margin-top: 0;
+        margin-bottom: 0.75rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    
+    .alert ul {
+        margin-bottom: 0;
+        padding-left: 1.5rem;
+    }
+    
+    .alert code {
+        background: rgba(0, 0, 0, 0.1);
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border: none;
+        padding: 0.875rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+        box-shadow: 0 4px 6px rgba(40, 167, 69, 0.3);
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(40, 167, 69, 0.4);
+        text-decoration: none;
+        color: white;
+    }
+    
+    .log-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        margin-top: 2rem;
+        overflow: hidden;
+    }
+    
+    .log-header {
+        background: #f8f9fa;
+        padding: 1.25rem 2rem;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #333;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .log-content {
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 0 0 12px 12px;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: #333;
+    }
+    
+    .info-box {
+        background: #e7f3ff;
+        border-left: 4px solid #2196F3;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        color: #1565C0;
+    }
+    
+    .info-box i {
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="repair-container">
+    <div class="page-header">
+        <h1><i class="fas fa-tools"></i> 手动修复DITA包</h1>
+        <p>上传手动修改后的DITA ZIP包，执行验证、链接化和构建</p>
+    </div>
+    
+    <div class="upload-card">
+        <div class="info-box">
+            <i class="fas fa-info-circle"></i>
+            <strong>使用说明：</strong>上传您已手动修改的DITA ZIP包，系统将执行验证、可选的引文链接化和可选的DITA-OT构建，最后生成新的ZIP包和质量报告。
+        </div>
+        
+        <form id="repairForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file" class="form-label">
+                    <i class="fas fa-file-archive"></i> 上传DITA ZIP包
+                </label>
+                <input type="file" class="form-control" id="file" name="file" accept=".zip" required>
+                <div class="form-text">支持最大200MB的ZIP文件</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="doc_name" class="form-label">
+                    <i class="fas fa-tag"></i> 文档名称（可选）
+                </label>
+                <input type="text" class="form-control" id="doc_name" name="doc_name" placeholder="留空则使用文件名">
+            </div>
+            
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="linkify" name="linkify" value="true">
+                <label class="form-check-label" for="linkify">
+                    <strong>执行引文链接化</strong>
+                    <div style="font-size: 0.875rem; color: #888; margin-top: 0.25rem;">
+                        将正文中的 [n] 转换为 &lt;xref&gt; 标签，链接到References文件
+                    </div>
+                </label>
+            </div>
+            
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="build" name="build" value="true">
+                <label class="form-check-label" for="build">
+                    <strong>执行DITA-OT构建</strong>
+                    <div style="font-size: 0.875rem; color: #888; margin-top: 0.25rem;">
+                        生成HTML5输出，构建日志将保存在输出ZIP中
+                    </div>
+                </label>
+            </div>
+            
+            <button type="submit" class="btn-primary" id="submitBtn">
+                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="spinner"></span>
+                <i class="fas fa-play"></i>
+                <span id="submitText">开始处理</span>
+            </button>
+        </form>
+    </div>
+    
+    <!-- 处理结果区域 -->
+    <div id="resultArea" class="result-card" style="display: none;">
+        <div class="result-header">
+            <i class="fas fa-check-circle"></i> 处理结果
+        </div>
+        <div class="result-body">
+            <div id="resultContent"></div>
+            
+            <div id="downloadSection" class="mt-3" style="display: none;">
+                <a id="downloadLink" href="#" class="btn-success">
+                    <i class="fas fa-download"></i> 下载结果ZIP
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 处理日志区域 -->
+    <div id="logArea" class="log-card" style="display: none;">
+        <div class="log-header">
+            <i class="fas fa-list-alt"></i> 处理日志
+        </div>
+        <div class="result-body">
+            <pre id="logContent" class="log-content"></pre>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('repairForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData();
+    const fileInput = document.getElementById('file');
+    const docNameInput = document.getElementById('doc_name');
+    const linkifyCheckbox = document.getElementById('linkify');
+    const buildCheckbox = document.getElementById('build');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitText = document.getElementById('submitText');
+    const spinner = document.getElementById('spinner');
+    const resultArea = document.getElementById('resultArea');
+    const resultContent = document.getElementById('resultContent');
+    const logArea = document.getElementById('logArea');
+    const logContent = document.getElementById('logContent');
+    const downloadSection = document.getElementById('downloadSection');
+    const downloadLink = document.getElementById('downloadLink');
+    
+    // 禁用提交按钮
+    submitBtn.disabled = true;
+    spinner.classList.remove('d-none');
+    submitText.textContent = '处理中...';
+    
+    // 准备表单数据
+    formData.append('file', fileInput.files[0]);
+    if (docNameInput.value) {
+        formData.append('doc_name', docNameInput.value);
+    }
+    formData.append('linkify', linkifyCheckbox.checked ? 'true' : 'false');
+    formData.append('build', buildCheckbox.checked ? 'true' : 'false');
+    
+    // 清空之前的结果
+    resultArea.style.display = 'none';
+    logArea.style.display = 'none';
+    downloadSection.style.display = 'none';
+    resultContent.innerHTML = '';
+    logContent.textContent = '';
+    
+    try {
+        const response = await fetch('/repair/process', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        // 显示结果
+        resultArea.style.display = 'block';
+        
+        if (result.success) {
+            // 构建文件列表HTML（更美观的样式）
+            let filesListHTML = '';
+            if (result.dita_files && result.dita_files.length > 0) {
+                filesListHTML = `
+                    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid #e0e0e0;">
+                        <h5 style="margin-bottom: 1rem; color: #333; font-size: 1.1rem;">
+                            <i class="fas fa-folder-open"></i> 输出文件列表 (${result.dita_files.length} 个文件)
+                        </h5>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                `;
+                result.dita_files.forEach(filepath => {
+                    const filename = filepath.split('/').pop() || filepath.split('\\').pop();
+                    const fileExt = filename.split('.').pop().toLowerCase();
+                    const canPreview = ['dita', 'xml', 'json', 'md', 'markdown'].includes(fileExt);
+                    
+                    // 根据文件类型选择图标
+                    let icon = 'fa-file';
+                    if (fileExt === 'dita' || fileExt === 'xml') {
+                        icon = 'fa-code';
+                    } else if (fileExt === 'json') {
+                        icon = 'fa-file-code';
+                    } else if (fileExt === 'md' || fileExt === 'markdown') {
+                        icon = 'fa-file-alt';
+                    }
+                    
+                    // 转义文件名和路径，防止XSS，同时将反斜杠转换为正斜杠（用于URL）
+                    const normalizedPath = filepath.replace(/\\/g, '/'); // Windows路径转URL路径
+                    const escapedPath = normalizedPath.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const escapedName = filename.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    
+                    filesListHTML += `
+                        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+                            <div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: white; border-radius: 6px; color: #667eea;">
+                                <i class="fas ${icon}"></i>
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 500; color: #333;">${escapedName}</div>
+                                <div style="font-size: 0.85rem; color: #888;">${filepath}</div>
+                            </div>
+                            ${canPreview ? `<button class="preview-btn" onclick="filePreviewer.previewRepair('${result.doc_name}', '${result.job_id}', '${escapedPath}', '${escapedName}')">
+                                <i class="fas fa-eye"></i> 预览
+                            </button>` : ''}
+                        </div>
+                    `;
+                });
+                filesListHTML += '</div></div>';
+            }
+            
+            resultContent.innerHTML = `
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check-circle"></i> 处理成功</h6>
+                    <ul class="mb-0">
+                        <li><strong>Job ID:</strong> <code>${result.job_id}</code></li>
+                        <li><strong>文档名称:</strong> ${result.doc_name}</li>
+                        <li><strong>DITA文件数:</strong> ${result.dita_files.length}</li>
+                        ${result.ref_index ? `<li><strong>引用索引:</strong> ${result.ref_index.count} 个引用 (${result.ref_index.range})</li>` : ''}
+                        ${result.linkify ? `<li><strong>链接化:</strong> ${result.linkify.count} 个引用${result.linkify.missing_refs.length > 0 ? `, ${result.linkify.missing_refs.length} 个缺失引用` : ''}</li>` : ''}
+                        ${result.validation ? `<li><strong>验证:</strong> ${result.validation.success} 成功, ${result.validation.failed} 失败</li>` : ''}
+                        ${result.dita_ot_build && result.dita_ot_build.success ? `<li><strong>DITA-OT构建:</strong> 成功</li>` : ''}
+                    </ul>
+                    ${filesListHTML}
+                </div>
+            `;
+            
+            // 显示下载链接
+            downloadSection.style.display = 'block';
+            downloadLink.href = `/repair/download/${encodeURIComponent(result.doc_name)}/${result.job_id}`;
+            
+        } else {
+            resultContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-circle"></i> 处理失败</h6>
+                    <p>${result.error || '未知错误'}</p>
+                    ${result.errors && result.errors.length > 0 ? `
+                        <ul>
+                            ${result.errors.map(e => `<li>${e}</li>`).join('')}
+                        </ul>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        // 显示警告（如果有）
+        if (result.warnings && result.warnings.length > 0) {
+            resultContent.innerHTML += `
+                <div class="alert alert-warning mt-2">
+                    <h6><i class="fas fa-exclamation-triangle"></i> 警告</h6>
+                    <ul class="mb-0">
+                        ${result.warnings.map(w => `<li>${w}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        // 显示详细日志（简化版）
+        if (result.validation && result.validation.errors) {
+            logArea.style.display = 'block';
+            logContent.textContent = JSON.stringify(result, null, 2);
+        }
+        
+        // 滚动到结果区域
+        resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+    } catch (error) {
+        resultArea.style.display = 'block';
+        resultContent.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="fas fa-exclamation-circle"></i> 请求失败</h6>
+                <p>${error.message}</p>
+            </div>
+        `;
+    } finally {
+        // 恢复提交按钮
+        submitBtn.disabled = false;
+        spinner.classList.add('d-none');
+        submitText.textContent = '开始处理';
+    }
+});
+</script>
+
+<script src="{{ url_for('static', filename='js/preview.js') }}"></script>
+{% endblock %}

@@ -204,6 +204,8 @@ def convert_file(session_id):
                             session_info['layers'][stage]['progress'] = progress
                             session_info['layers'][stage]['message'] = data.get('message', f'{stage} 处理中...')
                             session_info['layers'][stage]['status'] = 'completed' if progress == 100 else 'processing'
+                            # 保存详细数据供前端使用
+                            session_info['layers'][stage]['data'] = data
                         
                         # 计算总进度
                         stage_weights = {
@@ -262,7 +264,8 @@ def convert_file(session_id):
                     
                     if result['success']:
                         session_info['message'] = '🎉 转换完成！'
-                        session_info['output_dir'] = str(output_dir / 'final_dita')
+                        # 使用实际的output_dir，文件保存在 output_dir/layer1, output_dir/layer2 等目录中
+                        session_info['output_dir'] = str(output_dir)
                         
                         # 确保所有层都显示为100%完成
                         session_info['layers'] = {
@@ -392,6 +395,85 @@ def get_result(session_id):
             'success': False,
             'error': str(e)
         }), 500
+
+@bp.route('/layer/<session_id>/<layer_name>/files', methods=['GET'])
+def get_layer_files(session_id, layer_name):
+    """
+    获取指定层的文件列表
+    
+    Args:
+        session_id: 会话ID
+        layer_name: 层名称（layer1, layer2, layer3, layer4）
+        
+    Returns:
+        JSON: 文件列表
+    """
+    try:
+        if session_id not in sessions:
+            return jsonify({'error': '会话不存在'}), 404
+        
+        session_info = sessions[session_id]
+        
+        from src.utils.config import Config
+        filename = session_info.get('filename', '')
+        doc_name = Path(filename).stem if filename else None
+        
+        # 根据层名称确定查找策略
+        if layer_name in ['layer1', 'layer2']:
+            # Layer1和Layer2在 {session_id}_{doc_name}/ 目录中
+            output_dir = None
+            if doc_name:
+                possible_dirs = [
+                    Config.OUTPUT_DIR / f"{session_id}_{doc_name}",  # session_id_doc_name格式（主要路径）
+                    Config.OUTPUT_DIR / doc_name,  # doc_name格式（兼容性）
+                ]
+                for possible_dir in possible_dirs:
+                    if possible_dir.exists():
+                        output_dir = possible_dir
+                        break
+            layer_dir = output_dir / layer_name if output_dir else None
+        elif layer_name == 'layer3':
+            # Layer3的文件在 {session_id}/dita_drafts/ 目录中
+            output_dir = None
+            if 'output_dir' in session_info and session_info['output_dir']:
+                output_dir = Path(session_info['output_dir'])
+                if not output_dir.exists():
+                    output_dir = None
+            if output_dir is None:
+                output_dir = Path(Config.OUTPUT_DIR) / session_id
+            layer_dir = output_dir / 'dita_drafts' if output_dir.exists() else None
+        elif layer_name == 'layer4':
+            # Layer4的文件在 {session_id}/final_dita/ 目录中
+            output_dir = None
+            if 'output_dir' in session_info and session_info['output_dir']:
+                output_dir = Path(session_info['output_dir'])
+                if not output_dir.exists():
+                    output_dir = None
+            if output_dir is None:
+                output_dir = Path(Config.OUTPUT_DIR) / session_id
+            layer_dir = output_dir / 'final_dita' if output_dir.exists() else None
+        else:
+            layer_dir = None
+        
+        files = []
+        
+        if layer_dir and layer_dir.exists() and layer_dir.is_dir():
+            for file_path in layer_dir.rglob('*'):
+                if file_path.is_file():
+                    rel_path = file_path.relative_to(layer_dir)
+                    files.append({
+                        'name': file_path.name,
+                        'path': str(rel_path).replace('\\', '/'),
+                        'size': file_path.stat().st_size,
+                        'type': file_path.suffix[1:] if file_path.suffix else 'unknown'
+                    })
+        
+        current_app.logger.debug(f"找到 {len(files)} 个文件在 {layer_dir} (layer={layer_name})")
+        return jsonify({'success': True, 'files': files})
+    
+    except Exception as e:
+        current_app.logger.error(f"获取文件列表失败: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/layer/<session_id>/<layer_name>', methods=['GET'])
 def get_layer_result(session_id, layer_name):
@@ -545,6 +627,145 @@ def get_status(session_id):
             'success': False,
             'error': str(e)
         }), 500
+
+@bp.route('/preview/<session_id>/<layer>/<path:filepath>', methods=['GET'])
+def preview_layer_file(session_id, layer, filepath):
+    """
+    预览指定层的文件内容
+    
+    Args:
+        session_id: 会话ID
+        layer: 层名称（layer1, layer2, layer3, layer4）
+        filepath: 文件相对路径
+        
+    Returns:
+        文件内容（JSON格式，包含content和type）
+    """
+    try:
+        if session_id not in sessions:
+            return jsonify({'error': '会话不存在'}), 404
+        
+        session_info = sessions[session_id]
+        
+        from src.utils.config import Config
+        filename = session_info.get('filename', '')
+        doc_name = Path(filename).stem if filename else None
+        
+        # 根据层名称确定查找策略
+        if layer in ['layer1', 'layer2']:
+            # Layer1和Layer2在 {session_id}_{doc_name}/ 目录中
+            output_dir = None
+            if doc_name:
+                possible_dirs = [
+                    Config.OUTPUT_DIR / f"{session_id}_{doc_name}",  # session_id_doc_name格式（主要路径）
+                    Config.OUTPUT_DIR / doc_name,  # doc_name格式（兼容性）
+                ]
+                for possible_dir in possible_dirs:
+                    if possible_dir.exists():
+                        output_dir = possible_dir
+                        break
+            if output_dir is None or not output_dir.exists():
+                current_app.logger.error(f"找不到Layer{layer[-1]}输出目录: session_id={session_id}, doc_name={doc_name}")
+                return jsonify({'error': '输出目录不存在'}), 404
+            layer_dir = output_dir / layer
+        elif layer == 'layer3':
+            # Layer3的文件在 {session_id}/dita_drafts/ 目录中
+            output_dir = None
+            if 'output_dir' in session_info and session_info['output_dir']:
+                output_dir = Path(session_info['output_dir'])
+                if not output_dir.exists():
+                    output_dir = None
+            if output_dir is None:
+                output_dir = Path(Config.OUTPUT_DIR) / session_id
+            if not output_dir.exists():
+                current_app.logger.error(f"找不到Layer3输出目录: session_id={session_id}")
+                return jsonify({'error': '输出目录不存在'}), 404
+            layer_dir = output_dir / 'dita_drafts'
+        elif layer == 'layer4':
+            # Layer4的文件在 {session_id}/final_dita/ 目录中
+            output_dir = None
+            if 'output_dir' in session_info and session_info['output_dir']:
+                output_dir = Path(session_info['output_dir'])
+                if not output_dir.exists():
+                    output_dir = None
+            if output_dir is None:
+                output_dir = Path(Config.OUTPUT_DIR) / session_id
+            if not output_dir.exists():
+                current_app.logger.error(f"找不到Layer4输出目录: session_id={session_id}")
+                return jsonify({'error': '输出目录不存在'}), 404
+            layer_dir = output_dir / 'final_dita'
+        else:
+            current_app.logger.error(f"未知的层名称: {layer}")
+            return jsonify({'error': '未知的层名称'}), 400
+        
+        # 规范化文件路径（URL中的路径使用正斜杠）
+        normalized_filepath = filepath.replace('\\', '/')  # 统一为正斜杠
+        # 构建文件路径（Path对象会自动处理路径分隔符）
+        file_path = layer_dir / normalized_filepath
+        
+        # 安全检查：确保文件在输出目录内
+        try:
+            file_path.resolve().relative_to(output_dir.resolve())
+        except ValueError:
+            return jsonify({'error': '非法文件路径'}), 403
+        
+        if not file_path.exists() or not file_path.is_file():
+            return jsonify({'error': '文件不存在'}), 404
+        
+        # 读取文件内容
+        file_ext = file_path.suffix.lower()
+        file_type = 'text'
+        
+        # 根据文件类型确定内容类型
+        if file_ext in ['.md', '.markdown']:
+            file_type = 'markdown'
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        elif file_ext in ['.dita', '.xml']:
+            file_type = 'xml'
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        elif file_ext == '.json':
+            file_type = 'json'
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        elif file_ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg']:
+            file_type = 'image'
+            # 对于图片，返回base64编码
+            import base64
+            with open(file_path, 'rb') as f:
+                img_data = f.read()
+                content = base64.b64encode(img_data).decode('utf-8')
+                if file_ext == '.png':
+                    mime_type = 'image/png'
+                elif file_ext in ['.jpg', '.jpeg']:
+                    mime_type = 'image/jpeg'
+                elif file_ext == '.gif':
+                    mime_type = 'image/gif'
+                elif file_ext == '.svg':
+                    mime_type = 'image/svg+xml'
+                else:
+                    mime_type = 'image/png'
+        else:
+            # 默认按文本处理
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except UnicodeDecodeError:
+                return jsonify({'error': '无法以文本方式预览此文件'}), 400
+        
+        return jsonify({
+            'success': True,
+            'filename': file_path.name,
+            'filepath': filepath,
+            'content': content,
+            'type': file_type,
+            'mime_type': mime_type if file_type == 'image' else None
+        })
+    
+    except Exception as e:
+        current_app.logger.error(f"预览文件失败: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/download/<session_id>', methods=['GET'])
 @bp.route('/download/result/<session_id>', methods=['GET'])
